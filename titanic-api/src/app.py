@@ -25,9 +25,8 @@ def create_app(env_name: str) -> Flask:
 
     database_url = os.getenv("DATABASE_URL")
     logger.info(f"DATABASE_URL: {database_url}")
-    logger.info(
-        f"SQLALCHEMY_DATABASE_URI: {app.config.get(\"SQLALCHEMY_DATABASE_URI\")}"
-    )
+    db_uri_key = "SQLALCHEMY_DATABASE_URI"
+    logger.info(f"SQLALCHEMY_DATABASE_URI: {app.config.get(db_uri_key)}")
 
     db.init_app(app)
 
