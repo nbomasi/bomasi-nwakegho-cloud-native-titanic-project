@@ -49,8 +49,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-          cache-dependency-path: './titanic-api/requirements.txt'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('titanic-api/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
@@ -251,3 +257,4 @@ jobs:
           echo "CI Pipeline failed. Check the workflow run for details."
           # Add Slack/Email notification here if configured
           # Example: curl -X POST -H 'Content-type: application/json' --data '{"text":"CI Pipeline failed"}' ${{ secrets.SLACK_WEBHOOK_URL }}
+#
