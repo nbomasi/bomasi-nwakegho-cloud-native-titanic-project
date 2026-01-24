@@ -1,18 +1,16 @@
 name: CD - Staging Deployment
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI Pipeline"]
+    types:
+      - completed
     branches: [ main ]
-    paths:
-      - 'titanic-api/**'
-      - 'part-2-kubernetes/**'
-      - '.github/workflows/cd-staging.yml'
   workflow_dispatch:
     inputs:
       image_tag:
-        description: 'Docker image tag to deploy'
-        required: false
-        default: 'latest'
+        description: 'Docker image tag to deploy (must exist in registry)'
+        required: true
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION || 'eu-west-2' }}
@@ -24,11 +22,11 @@ jobs:
   deploy:
     name: Deploy to Staging
     runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch'
     environment: staging
     permissions:
       contents: read
       packages: read
-      id-token: write
 
     steps:
       - name: Checkout code
@@ -37,7 +35,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN_STAGING }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION || 'eu-west-2' }}
 
       - name: Set up kubectl
@@ -47,18 +46,18 @@ jobs:
 
       - name: Configure kubectl
         run: |
-          aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME_STAGING }} --region ${{ secrets.AWS_REGION || 'eu-west-1' }}
+          aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME_PROD }} --region ${{ secrets.AWS_REGION || 'eu-west-2' }}
 
       - name: Determine image tag
         id: image-tag
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ github.event.inputs.image_tag }}" ]; then
             echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
-          elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-8)
-            echo "tag=main-${SHORT_SHA}" >> $GITHUB_OUTPUT
           else
-            echo "tag=latest" >> $GITHUB_OUTPUT
+            # Use same image tag as CI built (main-<sha>)
+            CI_SHA="${{ github.event.workflow_run.head_sha }}"
+            SHORT_SHA=$(echo ${CI_SHA} | cut -c1-8)
+            echo "tag=main-${SHORT_SHA}" >> $GITHUB_OUTPUT
           fi
 
       - name: Run pre-deployment tests
@@ -79,10 +78,24 @@ jobs:
             --set config.flaskEnv=staging \
             --set replicaCount=2 \
             --set autoscaling.enabled=true \
+            --set autoscaling.minReplicas=2 \
+            --set autoscaling.maxReplicas=10 \
             --set ingress.enabled=true \
-            --set ingress.hosts[0].host=titanic-api-staging.example.com \
+            --set ingress.hosts[0].host=titanic-api.iyere.site \
+            --set ingress.annotations."cert-manager\.io/cluster-issuer"=letsencrypt-prod \
+            --set ingress.hosts[0].paths[0].path=/ \
+            --set ingress.hosts[0].paths[0].pathType=Prefix \
+            --set ingress.hosts[0].paths[1].path=/health \
+            --set ingress.hosts[0].paths[1].pathType=Exact \
+            --set ingress.hosts[0].paths[2].path=/people \
+            --set ingress.hosts[0].paths[2].pathType=Prefix \
+            --set podDisruptionBudget.enabled=true \
+            --set podDisruptionBudget.minAvailable=1 \
+            --set externalSecrets.externalSecret.enabled=true \
+            --set externalSecrets.secretStore.enabled=true \
             --wait \
-            --timeout 10m
+            --timeout 15m \
+            --atomic
 
       - name: Verify deployment
         run: |
@@ -97,9 +110,9 @@ jobs:
           if [ -n "$SERVICE_URL" ]; then
             echo "Running integration tests against $SERVICE_URL"
             # Health check
-            curl -f http://$SERVICE_URL/health || exit 1
+            curl -f https://$SERVICE_URL/health || exit 1
             # API endpoint test
-            curl -f http://$SERVICE_URL/api/people || echo "API test skipped"
+            curl -f https://$SERVICE_URL/people || echo "API test skipped"
           fi
 
       - name: Notify deployment status
@@ -122,7 +135,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN_STAGING }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION || 'eu-west-2' }}
 
       - name: Set up kubectl
@@ -130,7 +144,7 @@ jobs:
 
       - name: Configure kubectl
         run: |
-          aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME_STAGING }} --region ${{ secrets.AWS_REGION || 'eu-west-1' }}
+          aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME_PROD }} --region ${{ secrets.AWS_REGION || 'eu-west-2' }}
 
       - name: Rollback deployment
         run: |
