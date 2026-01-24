@@ -59,6 +59,7 @@ jobs:
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
+        working-directory: ./titanic-api
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
@@ -257,4 +258,3 @@ jobs:
           echo "CI Pipeline failed. Check the workflow run for details."
           # Add Slack/Email notification here if configured
           # Example: curl -X POST -H 'Content-type: application/json' --data '{"text":"CI Pipeline failed"}' ${{ secrets.SLACK_WEBHOOK_URL }}
-#
