@@ -66,6 +66,7 @@ jobs:
           helm lint ./part-2-kubernetes/helm/titanic-api
 
       - name: Deploy to Kubernetes using Helm
+        id: helm-deploy
         run: |
           helm upgrade --install titanic-api-staging \
             ./part-2-kubernetes/helm/titanic-api \
@@ -95,7 +96,29 @@ jobs:
             --set externalSecrets.secretStore.enabled=true \
             --wait \
             --timeout 15m \
-            --atomic
+            --atomic || {
+              echo "Helm deployment failed, gathering diagnostics..."
+              kubectl get pods -n ${{ env.K8S_NAMESPACE }} -l app=titanic-api
+              kubectl describe pods -n ${{ env.K8S_NAMESPACE }} -l app=titanic-api
+              kubectl logs -n ${{ env.K8S_NAMESPACE }} -l app=titanic-api --tail=100 || true
+              kubectl get events -n ${{ env.K8S_NAMESPACE }} --sort-by='.lastTimestamp' | tail -20
+              exit 1
+            }
+
+      - name: Check pod status
+        if: failure()
+        run: |
+          echo "=== Pod Status ==="
+          kubectl get pods -n ${{ env.K8S_NAMESPACE }} -l app=titanic-api -o wide
+          echo ""
+          echo "=== Pod Events ==="
+          kubectl get events -n ${{ env.K8S_NAMESPACE }} --field-selector involvedObject.kind=Pod --sort-by='.lastTimestamp' | tail -30
+          echo ""
+          echo "=== Pod Logs ==="
+          for pod in $(kubectl get pods -n ${{ env.K8S_NAMESPACE }} -l app=titanic-api -o jsonpath='{.items[*].metadata.name}'); do
+            echo "--- Logs for $pod ---"
+            kubectl logs -n ${{ env.K8S_NAMESPACE }} $pod --tail=50 || true
+          done
 
       - name: Verify deployment
         run: |

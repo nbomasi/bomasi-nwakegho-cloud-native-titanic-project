@@ -212,7 +212,7 @@ database:
 
 certManager:
   clusterIssuer:
-    enabled: true
+    enabled: false
     name: letsencrypt-prod
     server: https://acme-v02.api.letsencrypt.org/directory
     email: admin@iyere.site

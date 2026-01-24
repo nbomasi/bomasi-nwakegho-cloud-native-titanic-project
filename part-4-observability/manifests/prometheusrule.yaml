@@ -1,0 +1,72 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: titanic-api-alerts
+  namespace: titanic-api-prod
+  labels:
+    app: titanic-api
+    release: prometheus
+spec:
+  groups:
+  - name: titanic-api.rules
+    interval: 30s
+    rules:
+    - alert: HighErrorRate
+      expr: |
+        rate(titanic_api_http_requests_total{status=~"5.."}[5m]) > 0.05
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "High error rate detected in Titanic API"
+        description: "Error rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+
+    - alert: HighLatency
+      expr: |
+        histogram_quantile(0.95, rate(titanic_api_http_request_duration_seconds_bucket[5m])) > 1
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High latency detected in Titanic API"
+        description: "P95 latency is {{ $value }}s (threshold: 1s)"
+
+    - alert: PodCrashLoopBackOff
+      expr: |
+        kube_pod_status_phase{phase="Failed"} == 1
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Pod in CrashLoopBackOff"
+        description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is crashing"
+
+    - alert: HighCPUUsage
+      expr: |
+        rate(container_cpu_usage_seconds_total{pod=~"titanic-api.*", container!="POD"}[5m]) > 0.8
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High CPU usage detected"
+        description: "CPU usage is {{ $value | humanizePercentage }} for pod {{ $labels.pod }}"
+
+    - alert: HighMemoryUsage
+      expr: |
+        (container_memory_usage_bytes{pod=~"titanic-api.*", container!="POD"} / container_spec_memory_limit_bytes{pod=~"titanic-api.*", container!="POD"}) > 0.8
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High memory usage detected"
+        description: "Memory usage is {{ $value | humanizePercentage }} for pod {{ $labels.pod }}"
+
+    - alert: DatabaseConnectionFailure
+      expr: |
+        increase(titanic_api_database_connections_active[5m]) == 0
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Database connection failure"
+        description: "No active database connections detected for the last 2 minutes"

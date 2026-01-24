@@ -1,15 +1,34 @@
 import logging
 import os
+import time
 
-from flask import Flask
+from flask import Flask, request
 from sqlalchemy import text
 
 from .config import app_config
 from .models import db
 from .views.people import people_api as people
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+OBSERVABILITY_AVAILABLE = False
+http_requests_total = None
+http_request_duration_seconds = None
+
+try:
+    from .observability import init_observability
+    from .observability.metrics import (
+        http_requests_total as _http_requests_total,
+        http_request_duration_seconds as _http_request_duration_seconds,
+    )
+    http_requests_total = _http_requests_total
+    http_request_duration_seconds = _http_request_duration_seconds
+    OBSERVABILITY_AVAILABLE = True
+    logger.info("Observability modules loaded successfully")
+except ImportError as e:
+    logger.warning(f"Observability modules not available: {e}. Running without metrics and tracing.")
+except Exception as e:
+    logger.warning(f"Failed to load observability modules: {e}. Running without metrics and tracing.")
 
 
 def create_app(env_name: str) -> Flask:
@@ -31,6 +50,46 @@ def create_app(env_name: str) -> Flask:
     logger.info(f"SQLALCHEMY_DATABASE_URI: {app.config.get(db_uri_key)}")
 
     db.init_app(app)
+
+    if OBSERVABILITY_AVAILABLE:
+        init_observability(app, db_instance=db, log_level=os.getenv("LOG_LEVEL", "INFO"))
+
+    @app.before_request
+    def before_request():
+        """Track request metrics"""
+        request.start_time = time.time()
+
+    @app.after_request
+    def after_request(response):
+        """Track request completion metrics"""
+        if OBSERVABILITY_AVAILABLE and hasattr(request, "start_time") and http_requests_total and http_request_duration_seconds:
+            try:
+                duration = time.time() - request.start_time
+                endpoint = request.endpoint or "unknown"
+                method = request.method
+                status_code = response.status_code
+
+                http_request_duration_seconds.labels(
+                    method=method, endpoint=endpoint
+                ).observe(duration)
+
+                http_requests_total.labels(
+                    method=method, endpoint=endpoint, status=str(status_code)
+                ).inc()
+
+                logger.info(
+                    f"Request completed: {method} {request.path} - {status_code}",
+                    extra={
+                        "path": request.path,
+                        "method": method,
+                        "status_code": status_code,
+                        "duration_ms": round(duration * 1000, 2),
+                    },
+                )
+            except Exception as e:
+                logger.warning(f"Failed to record metrics: {e}")
+
+        return response
 
     # Create tables if they don't exist
     with app.app_context():
