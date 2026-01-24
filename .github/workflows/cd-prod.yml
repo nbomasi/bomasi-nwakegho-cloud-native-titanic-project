@@ -41,9 +41,8 @@ jobs:
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
           else
-            # Get tag from staging workflow - use the SHA from the triggering workflow
-            STAGING_SHA="${{ github.event.workflow_run.head_sha }}"
-            echo "tag=main-${STAGING_SHA:0:8}" >> $GITHUB_OUTPUT
+            # Use specific tag: main-099f7ac
+            echo "tag=main-099f7ac" >> $GITHUB_OUTPUT
           fi
 
       - name: Configure AWS credentials for image verification

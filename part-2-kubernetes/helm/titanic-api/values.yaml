@@ -181,7 +181,7 @@ database:
   persistence:
     enabled: true
     size: 10Gi
-    storageClass: standard
+    storageClass: ""
   resources:
     requests:
       cpu: 200m

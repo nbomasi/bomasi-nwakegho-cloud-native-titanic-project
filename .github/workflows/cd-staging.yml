@@ -54,11 +54,26 @@ jobs:
           if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ github.event.inputs.image_tag }}" ]; then
             echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
           else
-            # Use same image tag as CI built (main-<sha>)
-            CI_SHA="${{ github.event.workflow_run.head_sha }}"
-            SHORT_SHA=$(echo ${CI_SHA} | cut -c1-8)
-            echo "tag=main-${SHORT_SHA}" >> $GITHUB_OUTPUT
+            # Use specific tag: main-099f7ac
+            echo "tag=main-099f7ac" >> $GITHUB_OUTPUT
           fi
+
+      - name: Verify image exists in ECR
+        run: |
+          IMAGE_TAG=${{ steps.image-tag.outputs.tag }}
+          REPO_NAME=$(echo "${{ env.ECR_REPOSITORY_URL }}" | cut -d'/' -f2-)
+          IMAGE_URI="${{ env.ECR_REPOSITORY_URL }}:${IMAGE_TAG}"
+          echo "Verifying image exists in ECR: ${IMAGE_URI}"
+          aws ecr describe-images \
+            --repository-name "$REPO_NAME" \
+            --image-ids imageTag=${IMAGE_TAG} \
+            --region ${{ env.AWS_REGION }} || {
+              echo "Error: Image ${IMAGE_URI} not found in ECR"
+              echo "Available tags:"
+              aws ecr list-images --repository-name "$REPO_NAME" --region ${{ env.AWS_REGION }} --query 'imageIds[*].imageTag' --output table || true
+              exit 1
+            }
+          echo "✓ Image verified: ${IMAGE_URI}"
 
       - name: Run pre-deployment tests
         run: |
@@ -78,9 +93,7 @@ jobs:
             --set namespace=${{ env.K8S_NAMESPACE }} \
             --set config.flaskEnv=staging \
             --set replicaCount=2 \
-            --set autoscaling.enabled=true \
-            --set autoscaling.minReplicas=2 \
-            --set autoscaling.maxReplicas=10 \
+            --set autoscaling.enabled=false \
             --set ingress.enabled=true \
             --set ingress.hosts[0].host=titanic-api.iyere.site \
             --set ingress.annotations."cert-manager\.io/cluster-issuer"=letsencrypt-prod \
@@ -92,8 +105,9 @@ jobs:
             --set ingress.hosts[0].paths[2].pathType=Prefix \
             --set podDisruptionBudget.enabled=true \
             --set podDisruptionBudget.minAvailable=1 \
-            --set externalSecrets.externalSecret.enabled=true \
-            --set externalSecrets.secretStore.enabled=true \
+            --set database.enabled=false \
+            --set externalSecrets.externalSecret.enabled=false \
+            --set externalSecrets.secretStore.enabled=false \
             --wait \
             --timeout 15m \
             --atomic || {
