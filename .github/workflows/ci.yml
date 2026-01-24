@@ -50,6 +50,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
+          cache-dependency-path: './titanic-api/requirements.txt'
 
       - name: Install dependencies
         run: |
