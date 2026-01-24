@@ -14,9 +14,8 @@ on:
       - 'part-1-containerization/**'
 
 env:
-  AWS_REGION: ${{ secrets.AWS_REGION || 'eu-west-1' }}
-  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION || 'eu-west-1' }}.amazonaws.com
-  IMAGE_NAME: ${{ secrets.ECR_REPOSITORY_NAME || 'titanic-api-repo' }}
+  AWS_REGION: ${{ secrets.AWS_REGION || 'eu-west-2' }}
+  ECR_REPOSITORY_URL: ${{ secrets.ECR_REPOSITORY_URL || '456128143446.dkr.ecr.eu-west-2.amazonaws.com/titanic-api/titanic-api-repo' }}
   PYTHON_VERSION: '3.11'
 
 jobs:
@@ -164,14 +163,15 @@ jobs:
 
       - name: Create ECR repository if it doesn't exist
         run: |
-          aws ecr describe-repositories --repository-names ${{ env.IMAGE_NAME }} --region ${{ env.AWS_REGION }} || \
-          aws ecr create-repository --repository-name ${{ env.IMAGE_NAME }} --region ${{ env.AWS_REGION }}
+          REPO_NAME=$(echo "${{ env.ECR_REPOSITORY_URL }}" | cut -d'/' -f2-)
+          aws ecr describe-repositories --repository-names "$REPO_NAME" --region ${{ env.AWS_REGION }} || \
+          aws ecr create-repository --repository-name "$REPO_NAME" --region ${{ env.AWS_REGION }}
 
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.ECR_REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.ECR_REPOSITORY_URL }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -195,7 +195,7 @@ jobs:
       - name: Run Trivy image scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.ECR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+          image-ref: ${{ env.ECR_REPOSITORY_URL }}:${{ github.ref_name }}
           format: 'sarif'
           output: 'trivy-image-results.sarif'
           exit-code: '0'
@@ -210,14 +210,14 @@ jobs:
       - name: Generate image digest
         id: image-digest
         run: |
-          DIGEST=$(docker inspect ${{ env.ECR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} --format='{{index .RepoDigests 0}}' | cut -d'@' -f2)
+          DIGEST=$(docker inspect ${{ env.ECR_REPOSITORY_URL }}:${{ github.ref_name }} --format='{{index .RepoDigests 0}}' | cut -d'@' -f2)
           echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
       - name: Output image info
         run: |
-          echo "Image: ${{ env.ECR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}"
+          echo "Image: ${{ env.ECR_REPOSITORY_URL }}:${{ github.ref_name }}"
           echo "Digest: ${{ steps.image-digest.outputs.digest }}"
-          echo "ECR Repository: ${{ env.ECR_REGISTRY }}/${{ env.IMAGE_NAME }}"
+          echo "ECR Repository: ${{ env.ECR_REPOSITORY_URL }}"
 
       - name: Save image metadata
         run: |

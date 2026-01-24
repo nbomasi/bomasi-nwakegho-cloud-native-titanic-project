@@ -28,3 +28,17 @@ spec:
             name: titanic-api
             port:
               number: 80
+      - path: /health
+        pathType: Exact
+        backend:
+          service:
+            name: titanic-api
+            port:
+              number: 80
+      - path: /people
+        pathType: Prefix
+        backend:
+          service:
+            name: titanic-api
+            port:
+              number: 80

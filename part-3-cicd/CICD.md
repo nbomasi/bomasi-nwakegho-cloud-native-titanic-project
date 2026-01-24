@@ -391,13 +391,13 @@ The CI/CD pipeline consists of five main workflows:
 ### Required GitHub Secrets
 
 #### AWS Configuration
-- `AWS_ACCOUNT_ID` - AWS account ID (for ECR registry URL, e.g., `123456789012`)
+- `AWS_ACCOUNT_ID` - AWS account ID (for ECR registry URL, e.g., `456128143446`)
 - `AWS_ACCESS_KEY_ID` - AWS access key ID for CI pipeline (needs ECR push/pull permissions)
 - `AWS_SECRET_ACCESS_KEY` - AWS secret access key for CI pipeline
-- `ECR_REPOSITORY_NAME` - ECR repository name (default: `titanic-api-repo` if not set)
-- `AWS_REGION` - AWS region (default: eu-west-1)
+- `ECR_REPOSITORY_URL` - Full ECR repository URL (recommended: `456128143446.dkr.ecr.eu-west-2.amazonaws.com/titanic-api/titanic-api-repo`)
+- `AWS_REGION` - AWS region (default: eu-west-2)
 
-**Note:** The CI pipeline uses AWS access keys stored in GitHub Secrets. Ensure the IAM user has the required permissions listed below, especially **list permissions** for ECR operations.
+**Note:** The CI pipeline uses AWS access keys stored in GitHub Secrets. It's recommended to set `ECR_REPOSITORY_URL` as a single secret containing the full repository URL for cleaner configuration. Ensure the IAM user has the required permissions listed below, especially **list permissions** for ECR operations.
 
 #### EKS Cluster Names
 - `EKS_CLUSTER_NAME_DEV` - Development EKS cluster name
@@ -428,10 +428,10 @@ Configure the following environments in GitHub repository settings:
 ### Container Registry
 
 The pipeline uses **Amazon Elastic Container Registry (ECR)**:
-- Registry: `<aws-account-id>.dkr.ecr.<region>.amazonaws.com`
-- Repository: `titanic-api-repo`
-- Full image path: `<aws-account-id>.dkr.ecr.<region>.amazonaws.com/titanic-api-repo:<tag>`
+- Full Repository URL: `456128143446.dkr.ecr.eu-west-2.amazonaws.com/titanic-api/titanic-api-repo`
+- Full image path: `456128143446.dkr.ecr.eu-west-2.amazonaws.com/titanic-api/titanic-api-repo:<tag>`
 - Authentication: AWS IAM credentials via GitHub Secrets
+- Configuration: Set `ECR_REPOSITORY_URL` secret with the full repository URL (recommended approach)
 - ECR repository is automatically created if it doesn't exist
 
 ### IAM User Permissions Required
@@ -734,16 +734,16 @@ Add each secret with the following values:
 
 | Secret Name | Value | Example |
 |------------|-------|---------|
-| `AWS_ACCOUNT_ID` | Your AWS account ID | `123456789012` |
+| `AWS_ACCOUNT_ID` | Your AWS account ID | `456128143446` |
 | `AWS_ACCESS_KEY_ID` | AWS access key ID (from Step 2.3) | `AKIAIOSFODNN7EXAMPLE` |
 | `AWS_SECRET_ACCESS_KEY` | AWS secret access key (from Step 2.3) | `wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY` |
-| `ECR_REPOSITORY_NAME` | ECR repository name | `titanic-api-repo` (optional, defaults to `titanic-api-repo` if not set) |
-| `AWS_REGION` | AWS region | `eu-west-1` |
+| `ECR_REPOSITORY_URL` | Full ECR repository URL (recommended) | `456128143446.dkr.ecr.eu-west-2.amazonaws.com/titanic-api/titanic-api-repo` |
+| `AWS_REGION` | AWS region | `eu-west-2` |
 | `EKS_CLUSTER_NAME_DEV` | Development EKS cluster name | `titanic-api-eks-dev` |
 | `EKS_CLUSTER_NAME_STAGING` | Staging EKS cluster name | `titanic-api-eks-staging` |
 | `EKS_CLUSTER_NAME_PROD` | Production EKS cluster name | `titanic-api-eks-prod` |
 
-**Note:** The CI pipeline uses `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` for authentication. Ensure the IAM user has the required ECR permissions, especially **list permissions** (`ecr:ListImages`, `ecr:DescribeRepositories`).
+**Note:** The CI pipeline uses `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` for authentication. It's **recommended** to set `ECR_REPOSITORY_URL` as a single secret containing the full repository URL (e.g., `456128143446.dkr.ecr.eu-west-2.amazonaws.com/titanic-api/titanic-api-repo`) for cleaner and more maintainable configuration. Ensure the IAM user has the required ECR permissions, especially **list permissions** (`ecr:ListImages`, `ecr:DescribeRepositories`).
 
 **5.3 Verify Secrets**
 
@@ -766,11 +766,13 @@ git push origin develop
 **6.2 Verify ECR Repository**
 
 ```bash
-# Check if repository was created
-aws ecr describe-repositories --repository-names titanic-api-repo --region eu-west-1
+# Check if repository was created (extract repo name from URL)
+REPO_URL="456128143446.dkr.ecr.eu-west-2.amazonaws.com/titanic-api/titanic-api-repo"
+REPO_NAME=$(echo "$REPO_URL" | cut -d'/' -f2-)
+aws ecr describe-repositories --repository-names "$REPO_NAME" --region eu-west-2
 
 # List images in repository
-aws ecr list-images --repository-name titanic-api-repo --region eu-west-1
+aws ecr list-images --repository-name "$REPO_NAME" --region eu-west-2
 ```
 
 **6.3 Test Deployment**
@@ -843,7 +845,7 @@ gh workflow run "CD - Production Deployment" \
 #### Manual Rollback
 ```bash
 # Connect to cluster
-aws eks update-kubeconfig --name <cluster-name> --region eu-west-1
+aws eks update-kubeconfig --name <cluster-name> --region eu-west-2
 
 # Rollback deployment
 helm rollback titanic-api-prod -n titanic-api-prod

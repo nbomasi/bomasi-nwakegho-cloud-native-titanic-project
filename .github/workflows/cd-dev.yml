@@ -15,9 +15,8 @@ on:
         default: 'latest'
 
 env:
-  AWS_REGION: ${{ secrets.AWS_REGION || 'eu-west-1' }}
-  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION || 'eu-west-1' }}.amazonaws.com
-  IMAGE_NAME: ${{ secrets.ECR_REPOSITORY_NAME || 'titanic-api-repo' }}
+  AWS_REGION: ${{ secrets.AWS_REGION || 'eu-west-2' }}
+  ECR_REPOSITORY_URL: ${{ secrets.ECR_REPOSITORY_URL || '456128143446.dkr.ecr.eu-west-2.amazonaws.com/titanic-api/titanic-api-repo' }}
   K8S_NAMESPACE: titanic-api-dev
   K8S_ENVIRONMENT: dev
 
@@ -39,7 +38,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN_DEV }}
-          aws-region: ${{ secrets.AWS_REGION || 'eu-west-1' }}
+          aws-region: ${{ secrets.AWS_REGION || 'eu-west-2' }}
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
@@ -67,7 +66,7 @@ jobs:
             ./part-2-kubernetes/helm/titanic-api \
             --namespace ${{ env.K8S_NAMESPACE }} \
             --create-namespace \
-            --set image.repository=${{ env.ECR_REGISTRY }}/${{ env.IMAGE_NAME }} \
+            --set image.repository=${{ env.ECR_REPOSITORY_URL }} \
             --set image.tag=${{ steps.image-tag.outputs.tag }} \
             --set image.pullPolicy=Always \
             --set namespace=${{ env.K8S_NAMESPACE }} \
@@ -114,7 +113,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN_DEV }}
-          aws-region: ${{ secrets.AWS_REGION || 'eu-west-1' }}
+          aws-region: ${{ secrets.AWS_REGION || 'eu-west-2' }}
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3

@@ -17,9 +17,8 @@ on:
         default: false
 
 env:
-  AWS_REGION: ${{ secrets.AWS_REGION || 'eu-west-1' }}
-  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION || 'eu-west-1' }}.amazonaws.com
-  IMAGE_NAME: ${{ secrets.ECR_REPOSITORY_NAME || 'titanic-api-repo' }}
+  AWS_REGION: ${{ secrets.AWS_REGION || 'eu-west-2' }}
+  ECR_REPOSITORY_URL: ${{ secrets.ECR_REPOSITORY_URL || '456128143446.dkr.ecr.eu-west-2.amazonaws.com/titanic-api/titanic-api-repo' }}
   K8S_NAMESPACE: titanic-api-prod
   K8S_ENVIRONMENT: production
 
@@ -48,16 +47,18 @@ jobs:
       - name: Configure AWS credentials for image verification
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN_PROD }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Verify image exists in ECR
         run: |
           IMAGE_TAG=${{ steps.set-tag.outputs.tag }}
-          IMAGE_URI="${{ env.ECR_REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+          REPO_NAME=$(echo "${{ env.ECR_REPOSITORY_URL }}" | cut -d'/' -f2-)
+          IMAGE_URI="${{ env.ECR_REPOSITORY_URL }}:${IMAGE_TAG}"
           echo "Verifying image exists in ECR: ${IMAGE_URI}"
           aws ecr describe-images \
-            --repository-name ${{ env.IMAGE_NAME }} \
+            --repository-name "$REPO_NAME" \
             --image-ids imageTag=${IMAGE_TAG} \
             --region ${{ env.AWS_REGION }} || {
               echo "Error: Image ${IMAGE_URI} not found in ECR"
@@ -82,7 +83,6 @@ jobs:
     permissions:
       contents: read
       packages: read
-      id-token: write
 
     steps:
       - name: Checkout code
@@ -91,8 +91,9 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN_PROD }}
-          aws-region: ${{ secrets.AWS_REGION || 'eu-west-1' }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'eu-west-2' }}
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
@@ -101,7 +102,7 @@ jobs:
 
       - name: Configure kubectl
         run: |
-          aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME_PROD }} --region ${{ secrets.AWS_REGION || 'eu-west-1' }}
+          aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME_PROD }} --region ${{ secrets.AWS_REGION || 'eu-west-2' }}
 
       - name: Create backup of current deployment
         run: |
@@ -114,7 +115,7 @@ jobs:
             ./part-2-kubernetes/helm/titanic-api \
             --namespace ${{ env.K8S_NAMESPACE }} \
             --create-namespace \
-            --set image.repository=${{ env.ECR_REGISTRY }}/${{ env.IMAGE_NAME }} \
+            --set image.repository=${{ env.ECR_REPOSITORY_URL }} \
             --set image.tag=${{ needs.pre-deployment-checks.outputs.image_tag }} \
             --set image.pullPolicy=Always \
             --set namespace=${{ env.K8S_NAMESPACE }} \
@@ -185,7 +186,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN_PROD }}
-          aws-region: ${{ secrets.AWS_REGION || 'eu-west-1' }}
+          aws-region: ${{ secrets.AWS_REGION || 'eu-west-2' }}
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3

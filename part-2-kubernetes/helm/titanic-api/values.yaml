@@ -62,6 +62,10 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
+        - path: /health
+          pathType: Exact
+        - path: /people
+          pathType: Prefix
   tls:
     - secretName: titanic-api-tls
       hosts:
@@ -217,7 +221,7 @@ externalSecrets:
   secretStore:
     enabled: true
     name: aws-secrets-manager
-    region: eu-west-1
+    region: eu-west-2
     serviceAccount:
       name: external-secrets
       namespace: external-secrets
