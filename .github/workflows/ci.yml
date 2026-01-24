@@ -71,7 +71,7 @@ jobs:
 
       - name: Check code formatting (black)
         run: |
-          black --check src/
+          black --check --diff src/ || (echo "Files need formatting. Run: black src/" && exit 1)
 
       - name: Check import sorting (isort)
         run: |
