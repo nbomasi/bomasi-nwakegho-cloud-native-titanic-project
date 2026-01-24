@@ -22,13 +22,15 @@ def create_app(env_name: str) -> Flask:
     """
     app = Flask(__name__)
     app.config.from_object(app_config[env_name])
-    
-    database_url = os.getenv('DATABASE_URL')
+
+    database_url = os.getenv("DATABASE_URL")
     logger.info(f"DATABASE_URL: {database_url}")
-    logger.info(f"SQLALCHEMY_DATABASE_URI: {app.config.get('SQLALCHEMY_DATABASE_URI')}")
-    
+    logger.info(
+        f"SQLALCHEMY_DATABASE_URI: {app.config.get('SQLALCHEMY_DATABASE_URI')}"
+    )
+
     db.init_app(app)
-    
+
     # Create tables if they don't exist
     with app.app_context():
         try:
@@ -39,7 +41,7 @@ def create_app(env_name: str) -> Flask:
 
     app.register_blueprint(people, url_prefix="/")
 
-    @app.route('/', methods=['GET'])
+    @app.route("/", methods=["GET"])
     def index():
         """
         Root endpoint for populating root route
@@ -51,7 +53,7 @@ def create_app(env_name: str) -> Flask:
         Welcome to the Titanic API
         """
 
-    @app.route('/health', methods=['GET'])
+    @app.route("/health", methods=["GET"])
     def health():
         """
         Health check endpoint for container orchestration
@@ -61,12 +63,15 @@ def create_app(env_name: str) -> Flask:
         """
         try:
             with app.app_context():
-                db.session.execute(text('SELECT 1'))
+                db.session.execute(text("SELECT 1"))
                 db.session.commit()
-            return {'status': 'healthy', 'database': 'connected'}, 200
+            return {"status": "healthy", "database": "connected"}, 200
         except Exception as e:
             logger.error(f"Health check failed: {str(e)}")
-            return {'status': 'unhealthy', 'database': 'disconnected', 'error': str(e)}, 503
-
+            return {
+                "status": "unhealthy",
+                "database": "disconnected",
+                "error": str(e),
+            }, 503
 
     return app

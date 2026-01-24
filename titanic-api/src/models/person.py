@@ -5,11 +5,12 @@ from sqlalchemy.dialects.postgresql import UUID
 from . import db
 import uuid
 
+
 class Person(db.Model):
     """
     Database model for storing the data of people on the Titanic
     """
-    __tablename__ = 'people'
+    __tablename__ = "people"
 
     uuid = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     survived = db.Column(db.Integer)
@@ -22,14 +23,14 @@ class Person(db.Model):
     fare = db.Column(db.Float)
 
     def __init__(self, data):
-        self.survived = data.get('survived')
-        self.passengerClass = data.get('passengerClass')
-        self.name = data.get('name')
-        self.sex = data.get('sex')
-        self.age = data.get('age')
-        self.siblingsOrSpousesAboard = data.get('siblingsOrSpousesAboard')
-        self.parentsOrChildrenAboard = data.get('parentsOrChildrenAboard')
-        self.fare = data.get('fare')
+        self.survived = data.get("survived")
+        self.passengerClass = data.get("passengerClass")
+        self.name = data.get("name")
+        self.sex = data.get("sex")
+        self.age = data.get("age")
+        self.siblingsOrSpousesAboard = data.get("siblingsOrSpousesAboard")
+        self.parentsOrChildrenAboard = data.get("parentsOrChildrenAboard")
+        self.fare = data.get("fare")
 
     def save(self) -> None:
         """
