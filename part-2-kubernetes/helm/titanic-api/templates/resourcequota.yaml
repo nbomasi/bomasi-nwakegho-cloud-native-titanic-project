@@ -1,0 +1,39 @@
+{{- if .Values.resourceQuota.enabled }}
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: {{ include "titanic-api.fullname" . }}-quota
+  namespace: {{ .Values.namespace | default "titanic-api" }}
+  labels:
+    {{- include "titanic-api.labels" . | nindent 4 }}
+spec:
+  hard:
+    requests.cpu: {{ .Values.resourceQuota.requests.cpu | quote }}
+    requests.memory: {{ .Values.resourceQuota.requests.memory }}
+    limits.cpu: {{ .Values.resourceQuota.limits.cpu | quote }}
+    limits.memory: {{ .Values.resourceQuota.limits.memory }}
+    persistentvolumeclaims: {{ .Values.resourceQuota.persistentvolumeclaims | quote }}
+    {{- if .Values.resourceQuota.servicesLoadbalancers }}
+    services.loadbalancers: {{ .Values.resourceQuota.servicesLoadbalancers | quote }}
+    {{- end }}
+
+{{- if .Values.limitRange.enabled }}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: {{ include "titanic-api.fullname" . }}-limits
+  namespace: {{ .Values.namespace | default "titanic-api" }}
+  labels:
+    {{- include "titanic-api.labels" . | nindent 4 }}
+spec:
+  limits:
+  - default:
+      cpu: {{ .Values.limitRange.default.cpu }}
+      memory: {{ .Values.limitRange.default.memory }}
+    defaultRequest:
+      cpu: {{ .Values.limitRange.defaultRequest.cpu }}
+      memory: {{ .Values.limitRange.defaultRequest.memory }}
+    type: Container
+{{- end }}
+{{- end }}

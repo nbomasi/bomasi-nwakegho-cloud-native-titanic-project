@@ -1,0 +1,64 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: titanic-staging
+
+resources:
+  - ../../base
+
+replicas:
+  - name: titanic-api
+    count: 2
+
+images:
+  - name: titanic-api
+    newName: titanic-api
+    newTag: staging
+
+patches:
+  - target:
+      kind: Deployment
+      name: titanic-api
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 100m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 256Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 500m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 512Mi
+  - target:
+      kind: ConfigMap
+      name: titanic-config
+    patch: |-
+      - op: replace
+        path: /data/flask-env
+        value: staging
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: titanic-api-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 2
+      - op: replace
+        path: /spec/maxReplicas
+        value: 5
+  - target:
+      kind: Ingress
+      name: titanic-api-ingress
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: titanic-api-staging.example.com
+
+configMapGenerator:
+  - name: titanic-config
+    behavior: merge
+    literals:
+      - environment=staging

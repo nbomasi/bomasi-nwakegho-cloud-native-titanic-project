@@ -1,0 +1,13 @@
+apiVersion: v2
+name: titanic-api
+description: A Helm chart for Titanic API Kubernetes deployment
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - flask
+  - api
+  - titanic
+  - postgresql
+maintainers:
+  - name: DevOps Team

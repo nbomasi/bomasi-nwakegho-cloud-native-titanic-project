@@ -1,0 +1,76 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "titanic-api.fullname" . }}-network-policy
+  namespace: {{ .Values.namespace | default "titanic-api" }}
+  labels:
+    {{- include "titanic-api.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "titanic-api.selectorLabels" . | nindent 6 }}
+      component: api
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 5000
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          {{- include "titanic-api.selectorLabels" . | nindent 10 }}
+          component: database
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+
+{{- if .Values.database.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "titanic-api.fullname" . }}-db-network-policy
+  namespace: {{ .Values.namespace | default "titanic-api" }}
+  labels:
+    {{- include "titanic-api.labels" . | nindent 4 }}
+    component: database
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "titanic-api.selectorLabels" . | nindent 6 }}
+      component: database
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          {{- include "titanic-api.selectorLabels" . | nindent 10 }}
+          component: api
+    ports:
+    - protocol: TCP
+      port: 5432
+  egress:
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+{{- end }}
+{{- end }}

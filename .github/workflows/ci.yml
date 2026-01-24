@@ -1,0 +1,248 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'titanic-api/**'
+      - 'part-1-containerization/**'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'titanic-api/**'
+      - 'part-1-containerization/**'
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION || 'eu-west-1' }}
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION || 'eu-west-1' }}.amazonaws.com
+  IMAGE_NAME: ${{ secrets.ECR_REPOSITORY_NAME || 'titanic-api-repo' }}
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./titanic-api
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: titanic_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: titanic_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-flask flake8 black isort mypy
+
+      - name: Run linter (flake8)
+        run: |
+          flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 src/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Check code formatting (black)
+        run: |
+          black --check src/
+
+      - name: Check import sorting (isort)
+        run: |
+          isort --check-only src/
+
+      - name: Type checking (mypy)
+        run: |
+          mypy src/ --ignore-missing-imports || true
+
+      - name: Run unit tests
+        env:
+          DATABASE_URL: postgresql+psycopg2://titanic_user:test_password@localhost:5432/titanic_db
+          FLASK_ENV: testing
+        run: |
+          pytest tests/ -v --cov=src --cov-report=xml --cov-report=html --cov-report=term || true
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          file: ./titanic-api/coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: Check coverage threshold
+        run: |
+          coverage=$(pytest tests/ --cov=src --cov-report=term-missing | grep TOTAL | awk '{print $NF}' | sed 's/%//')
+          threshold=70
+          if (( $(echo "$coverage < $threshold" | bc -l) )); then
+            echo "Coverage $coverage% is below threshold of $threshold%"
+            exit 1
+          fi
+          echo "Coverage $coverage% meets threshold of $threshold%"
+        continue-on-error: true
+
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './titanic-api'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run Bandit security linter
+        working-directory: ./titanic-api
+        run: |
+          pip install bandit
+          bandit -r src/ -f json -o bandit-report.json || true
+
+      - name: Upload Bandit results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-report
+          path: titanic-api/bandit-report.json
+
+  build:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: [test, security-scan]
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Create ECR repository if it doesn't exist
+        run: |
+          aws ecr describe-repositories --repository-names ${{ env.IMAGE_NAME }} --region ${{ env.AWS_REGION }} || \
+          aws ecr create-repository --repository-name ${{ env.IMAGE_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.ECR_REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./part-1-containerization/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+      - name: Run Trivy image scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.ECR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+          format: 'sarif'
+          output: 'trivy-image-results.sarif'
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy image scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-image-results.sarif'
+
+      - name: Generate image digest
+        id: image-digest
+        run: |
+          DIGEST=$(docker inspect ${{ env.ECR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} --format='{{index .RepoDigests 0}}' | cut -d'@' -f2)
+          echo "digest=$DIGEST" >> $GITHUB_OUTPUT
+
+      - name: Output image info
+        run: |
+          echo "Image: ${{ env.ECR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}"
+          echo "Digest: ${{ steps.image-digest.outputs.digest }}"
+          echo "ECR Repository: ${{ env.ECR_REGISTRY }}/${{ env.IMAGE_NAME }}"
+
+      - name: Save image metadata
+        run: |
+          echo "${{ github.ref_name }}" > image-tag.txt
+          echo "${{ steps.image-digest.outputs.digest }}" > image-digest.txt
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+
+      - name: Upload image metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-metadata
+          path: |
+            image-tag.txt
+            image-digest.txt
+          retention-days: 30
+
+  notify:
+    name: Notify Pipeline Status
+    runs-on: ubuntu-latest
+    needs: [test, security-scan, build]
+    if: always()
+    steps:
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "CI Pipeline failed. Check the workflow run for details."
+          # Add Slack/Email notification here if configured
+          # Example: curl -X POST -H 'Content-type: application/json' --data '{"text":"CI Pipeline failed"}' ${{ secrets.SLACK_WEBHOOK_URL }}

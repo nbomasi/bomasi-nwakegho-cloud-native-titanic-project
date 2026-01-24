@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: titanic-config
+  namespace: titanic-api
+  labels:
+    app: titanic-api
+data:
+  flask-env: production
+  postgres-db: titanic_db
+  app-name: titanic-api
+  app-version: "1.0.0"
+  log-level: INFO

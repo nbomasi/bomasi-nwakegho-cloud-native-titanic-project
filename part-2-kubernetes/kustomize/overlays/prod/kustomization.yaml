@@ -1,0 +1,60 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: titanic-prod
+
+resources:
+  - ../../base
+
+replicas:
+  - name: titanic-api
+    count: 3
+
+images:
+  - name: titanic-api
+    newName: titanic-api
+    newTag: latest
+
+patches:
+  - target:
+      kind: Deployment
+      name: titanic-api
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 200m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 512Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 1000m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 1Gi
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: titanic-api-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 20
+  - target:
+      kind: Ingress
+      name: titanic-api-ingress
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: titanic-api.iyere.site
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: titanic-api.iyere.site
+
+configMapGenerator:
+  - name: titanic-config
+    behavior: merge
+    literals:
+      - environment=production

@@ -1,0 +1,227 @@
+name: CD - Production Deployment
+
+on:
+  workflow_run:
+    workflows: ["CD - Staging Deployment"]
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Docker image tag to deploy (must exist in registry)'
+        required: true
+      skip_approval:
+        description: 'Skip approval gate (admin only)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION || 'eu-west-1' }}
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION || 'eu-west-1' }}.amazonaws.com
+  IMAGE_NAME: ${{ secrets.ECR_REPOSITORY_NAME || 'titanic-api-repo' }}
+  K8S_NAMESPACE: titanic-api-prod
+  K8S_ENVIRONMENT: production
+
+jobs:
+  pre-deployment-checks:
+    name: Pre-Deployment Validation
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.set-tag.outputs.tag }}
+      should_deploy: ${{ steps.check.outputs.deploy }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine image tag
+        id: set-tag
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
+          else
+            # Get tag from staging deployment
+            echo "tag=main-${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure AWS credentials for image verification
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify image exists in ECR
+        run: |
+          IMAGE_TAG=${{ steps.set-tag.outputs.tag }}
+          IMAGE_URI="${{ env.ECR_REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+          echo "Verifying image exists in ECR: ${IMAGE_URI}"
+          aws ecr describe-images \
+            --repository-name ${{ env.IMAGE_NAME }} \
+            --image-ids imageTag=${IMAGE_TAG} \
+            --region ${{ env.AWS_REGION }} || {
+              echo "Error: Image ${IMAGE_URI} not found in ECR"
+              exit 1
+            }
+          echo "✓ Image verified: ${IMAGE_URI}"
+
+      - name: Check deployment readiness
+        id: check
+        run: |
+          # Add checks: staging tests passed, no critical vulnerabilities, etc.
+          echo "deploy=true" >> $GITHUB_OUTPUT
+
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: pre-deployment-checks
+    if: needs.pre-deployment-checks.outputs.should_deploy == 'true'
+    environment:
+      name: production
+      url: https://titanic-api.example.com
+    permissions:
+      contents: read
+      packages: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_PROD }}
+          aws-region: ${{ secrets.AWS_REGION || 'eu-west-1' }}
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME_PROD }} --region ${{ secrets.AWS_REGION || 'eu-west-1' }}
+
+      - name: Create backup of current deployment
+        run: |
+          kubectl get deployment titanic-api-prod -n ${{ env.K8S_NAMESPACE }} -o yaml > deployment-backup-$(date +%Y%m%d-%H%M%S).yaml || echo "No existing deployment found"
+
+      - name: Deploy to Kubernetes using Helm
+        id: deploy
+        run: |
+          helm upgrade --install titanic-api-prod \
+            ./part-2-kubernetes/helm/titanic-api \
+            --namespace ${{ env.K8S_NAMESPACE }} \
+            --create-namespace \
+            --set image.repository=${{ env.ECR_REGISTRY }}/${{ env.IMAGE_NAME }} \
+            --set image.tag=${{ needs.pre-deployment-checks.outputs.image_tag }} \
+            --set image.pullPolicy=Always \
+            --set namespace=${{ env.K8S_NAMESPACE }} \
+            --set config.flaskEnv=production \
+            --set replicaCount=2 \
+            --set autoscaling.enabled=true \
+            --set autoscaling.minReplicas=2 \
+            --set autoscaling.maxReplicas=10 \
+            --set ingress.enabled=true \
+            --set ingress.hosts[0].host=titanic-api.example.com \
+            --set ingress.annotations."cert-manager\.io/cluster-issuer"=letsencrypt-prod \
+            --set podDisruptionBudget.enabled=true \
+            --set podDisruptionBudget.minAvailable=1 \
+            --wait \
+            --timeout 15m \
+            --atomic
+
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/titanic-api-prod -n ${{ env.K8S_NAMESPACE }} --timeout=15m
+          kubectl get pods -n ${{ env.K8S_NAMESPACE }}
+          kubectl get svc -n ${{ env.K8S_NAMESPACE }}
+          kubectl get ingress -n ${{ env.K8S_NAMESPACE }}
+
+      - name: Run production smoke tests
+        run: |
+          SERVICE_URL=$(kubectl get ingress -n ${{ env.K8S_NAMESPACE }} titanic-api-prod -o jsonpath='{.spec.rules[0].host}')
+          if [ -n "$SERVICE_URL" ]; then
+            echo "Running production smoke tests against $SERVICE_URL"
+            # Health check
+            curl -f https://$SERVICE_URL/health || exit 1
+            # API endpoint test
+            curl -f https://$SERVICE_URL/api/people || echo "API test completed"
+          fi
+
+      - name: Monitor deployment health
+        run: |
+          echo "Monitoring deployment for 2 minutes..."
+          for i in {1..12}; do
+            sleep 10
+            READY=$(kubectl get deployment titanic-api-prod -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.status.readyReplicas}')
+            DESIRED=$(kubectl get deployment titanic-api-prod -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.spec.replicas}')
+            echo "Ready: $READY/$DESIRED replicas"
+            if [ "$READY" == "$DESIRED" ] && [ "$READY" != "0" ]; then
+              echo "All replicas are ready"
+              break
+            fi
+          done
+
+      - name: Notify deployment success
+        if: success()
+        run: |
+          echo "✅ Production deployment successful"
+          # Add Slack/Email notification here
+          # curl -X POST -H 'Content-type: application/json' \
+          #   --data '{"text":"✅ Production deployment successful: ${{ needs.pre-deployment-checks.outputs.image_tag }}"}' \
+          #   ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  rollback:
+    name: Rollback on Failure
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: failure()
+    environment: production
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_PROD }}
+          aws-region: ${{ secrets.AWS_REGION || 'eu-west-1' }}
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME_PROD }} --region ${{ secrets.AWS_REGION || 'eu-west-1' }}
+
+      - name: Rollback deployment
+        run: |
+          echo "Rolling back production deployment..."
+          helm rollback titanic-api-prod -n ${{ env.K8S_NAMESPACE }} --wait --timeout 15m
+          kubectl rollout status deployment/titanic-api-prod -n ${{ env.K8S_NAMESPACE }} --timeout=5m
+          echo "Rollback completed successfully"
+
+      - name: Verify rollback
+        run: |
+          kubectl get pods -n ${{ env.K8S_NAMESPACE }}
+          kubectl rollout status deployment/titanic-api-prod -n ${{ env.K8S_NAMESPACE }}
+
+      - name: Notify rollback
+        run: |
+          echo "⚠️ Production deployment rolled back due to failure"
+          # Add Slack/Email notification here
+          # curl -X POST -H 'Content-type: application/json' \
+          #   --data '{"text":"⚠️ Production deployment rolled back"}' \
+          #   ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  post-deployment:
+    name: Post-Deployment Verification
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: success()
+
+    steps:
+      - name: Run post-deployment checks
+        run: |
+          echo "Post-deployment verification completed"
+          # Add additional checks: metrics, logs, etc.

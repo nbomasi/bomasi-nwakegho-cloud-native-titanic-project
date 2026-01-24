@@ -1,0 +1,32 @@
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: titanic-api-gateway
+  namespace: titanic-api
+  labels:
+    app: titanic-api
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - titanic-api.example.com
+    - titanic-api-dev.example.com
+    - titanic-api-staging.example.com
+    http:
+      maxRequestHeadersKb: 96
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: titanic-api-tls
+    hosts:
+    - titanic-api.example.com
+    - titanic-api-dev.example.com
+    - titanic-api-staging.example.com
