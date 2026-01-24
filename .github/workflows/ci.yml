@@ -60,7 +60,13 @@ jobs:
 
       - name: Install dependencies
         run: |
+          pwd
+          ls -la
+          echo "Checking for titanic-api directory..."
+          ls -la titanic-api/ || echo "titanic-api directory not found"
           cd titanic-api
+          pwd
+          ls -la
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest pytest-cov pytest-flask flake8 black isort mypy
