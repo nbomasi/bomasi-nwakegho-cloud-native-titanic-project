@@ -1,10 +1,12 @@
+import logging
+import os
+
 from flask import Flask
 from sqlalchemy import text
+
 from .config import app_config
 from .models import db
 from .views.people import people_api as people
-import os
-import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

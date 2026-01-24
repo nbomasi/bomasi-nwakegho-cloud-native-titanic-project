@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import uuid
+
 from marshmallow import fields, Schema
 from sqlalchemy.dialects.postgresql import UUID
+
 from . import db
-import uuid
 
 
 class Person(db.Model):
