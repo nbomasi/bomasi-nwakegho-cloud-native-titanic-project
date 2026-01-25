@@ -80,6 +80,28 @@ jobs:
           echo "Running pre-deployment validation..."
           helm lint ./part-2-kubernetes/helm/titanic-api
 
+      - name: Wait for ClusterSecretStore to be ready
+        run: |
+          echo "Checking if ClusterSecretStore exists..."
+          if kubectl get clustersecretstore aws-secrets-manager &>/dev/null; then
+            echo "ClusterSecretStore exists, checking readiness..."
+            for i in {1..30}; do
+              READY=$(kubectl get clustersecretstore aws-secrets-manager -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
+              if [ "$READY" == "True" ]; then
+                echo "✓ ClusterSecretStore is ready"
+                break
+              fi
+              echo "Waiting for ClusterSecretStore to be ready... (attempt $i/30)"
+              sleep 2
+            done
+            if [ "$READY" != "True" ]; then
+              echo "⚠️ ClusterSecretStore may not be ready, but proceeding..."
+              kubectl describe clustersecretstore aws-secrets-manager || true
+            fi
+          else
+            echo "⚠️ ClusterSecretStore not found. It will be created by Helm hooks."
+          fi
+
       - name: Deploy to Kubernetes using Helm
         id: helm-deploy
         run: |
@@ -120,6 +142,33 @@ jobs:
               kubectl get events -n ${{ env.K8S_NAMESPACE }} --sort-by='.lastTimestamp' | tail -20
               exit 1
             }
+
+      - name: Wait for ExternalSecret to sync
+        run: |
+          echo "Waiting for ExternalSecret to sync secrets from AWS Secrets Manager..."
+          for i in {1..60}; do
+            if kubectl get externalsecret titanic-api-staging-secrets -n ${{ env.K8S_NAMESPACE }} &>/dev/null; then
+              SYNC_STATUS=$(kubectl get externalsecret titanic-api-staging-secrets -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
+              if [ "$SYNC_STATUS" == "True" ]; then
+                echo "✓ ExternalSecret synced successfully"
+                kubectl get secret titanic-api-staging-secrets -n ${{ env.K8S_NAMESPACE }} || true
+                break
+              fi
+              echo "Waiting for ExternalSecret to sync... (attempt $i/60) - Status: $SYNC_STATUS"
+              if [ $i -le 10 ]; then
+                kubectl describe externalsecret titanic-api-staging-secrets -n ${{ env.K8S_NAMESPACE }} | tail -20 || true
+              fi
+            else
+              echo "ExternalSecret not found yet... (attempt $i/60)"
+            fi
+            sleep 5
+          done
+          if [ "$SYNC_STATUS" != "True" ]; then
+            echo "⚠️ ExternalSecret may not have synced, checking status..."
+            kubectl get externalsecret titanic-api-staging-secrets -n ${{ env.K8S_NAMESPACE }} -o yaml || true
+            kubectl get clustersecretstore aws-secrets-manager -o yaml || true
+            echo "Proceeding anyway - secret may sync later or needs manual intervention..."
+          fi
 
       - name: Check pod status
         if: failure()
