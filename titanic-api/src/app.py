@@ -8,6 +8,7 @@ from sqlalchemy import text
 from .config import app_config
 from .models import db
 from .views.people import people_api as people
+from .views.auth import auth_api as auth
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,7 @@ def create_app(env_name: str) -> Flask:
             logger.warning(f"Could not create tables: {str(e)}")
 
     app.register_blueprint(people, url_prefix="/")
+    app.register_blueprint(auth, url_prefix="/")
 
     @app.route("/", methods=["GET"])
     def index():

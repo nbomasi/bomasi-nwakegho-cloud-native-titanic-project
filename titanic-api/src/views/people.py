@@ -1,5 +1,6 @@
 from flask import request, json, Response, Blueprint
 from ..models.person import Person, PersonSchema
+from ..auth import require_auth, require_role
 
 
 people_api = Blueprint("people", __name__)
@@ -7,6 +8,7 @@ person_schema = PersonSchema()
 
 
 @people_api.route("people", methods=["GET"])
+@require_auth
 def get_all() -> Response:
     """
     Endpoint returning all people from the database
@@ -21,6 +23,7 @@ def get_all() -> Response:
 
 
 @people_api.route("people/<person_uuid>", methods=["PUT"])
+@require_auth
 def update_person(person_uuid: str) -> Response:
     """
     Endpoint to update a person
@@ -42,6 +45,8 @@ def update_person(person_uuid: str) -> Response:
 
 
 @people_api.route("people/<person_uuid>", methods=["DELETE"])
+@require_auth
+@require_role("admin")
 def delete_person(person_uuid: str) -> Response:
     """
     Endpoint to delete a person
@@ -60,6 +65,7 @@ def delete_person(person_uuid: str) -> Response:
 
 
 @people_api.route("people/<person_uuid>", methods=["GET"])
+@require_auth
 def get_by_id(person_uuid: str) -> Response:
     """
     Endpoint returning a person by their UUID from the database
@@ -79,6 +85,7 @@ def get_by_id(person_uuid: str) -> Response:
 
 
 @people_api.route("people", methods=["POST"])
+@require_auth
 def add_passenger() -> Response:
     """
     Endpoint adding a new person to the database based on the JSON payload of the request
