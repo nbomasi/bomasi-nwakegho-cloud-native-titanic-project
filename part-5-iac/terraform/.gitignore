@@ -1,0 +1,67 @@
+# Local .terraform directories
+**/.terraform/*
+
+# .tfstate files
+*.tfstate
+*.tfstate.*
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Exclude all .tfvars files, which are likely to contain sensitive data
+*.tfvars
+*.tfvars.json
+
+# Override files as they are usually used to override resources locally
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# CLI configuration files
+.terraformrc
+terraform.rc
+
+# Kubeconfig files
+kubeconfig-*
+
+# Local environment files
+*.tfvars.local
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# macOS files
+.DS_Store
+
+# Backup files
+*.backup
+*.bak
+
+# GitOps SSH keys (security)
+gitops/.ssh/
+*.pem
+*.key
+*_rsa
+*_ed25519
+id_rsa*
+id_ed25519*
+
+# Terraform plan files
+tfplan
+*.tfplan
+plan-output.txt
+
+# Include lock file for reproducible builds (comment out if you don't want to commit it)
+# .terraform.lock.hcl
+
+# Additional SSH key patterns
+argocd-deploy-key*
+deploy-key*
+*.pub
+ssh-*

@@ -7,10 +7,17 @@ from datetime import datetime, timedelta
 from functools import wraps
 from typing import Optional, Dict, Any
 
-import jwt
-from flask import request, jsonify, Response
-
 logger = logging.getLogger(__name__)
+
+try:
+    import jwt
+    JWT_AVAILABLE = True
+except ImportError:
+    JWT_AVAILABLE = False
+    jwt = None
+    logger.warning("PyJWT not installed. Authentication features will be disabled.")
+
+from flask import request, jsonify, Response
 
 
 def get_jwt_secret() -> Optional[str]:
@@ -43,8 +50,11 @@ def generate_token(user_id: str, username: str, roles: list = None, expires_in: 
         Encoded JWT token
 
     Raises:
-        ValueError: If JWT_SECRET_KEY is not set
+        ValueError: If JWT_SECRET_KEY is not set or PyJWT is not installed
     """
+    if not JWT_AVAILABLE:
+        raise ValueError("PyJWT is not installed. Cannot generate token.")
+    
     secret = get_jwt_secret()
     if not secret:
         raise ValueError("JWT_SECRET_KEY environment variable is not set. Cannot generate token.")
@@ -78,6 +88,10 @@ def verify_token(token: str) -> Optional[Dict[str, Any]]:
     Returns:
         Decoded token payload if valid, None otherwise
     """
+    if not JWT_AVAILABLE:
+        logger.warning("PyJWT is not installed. Cannot verify token.")
+        return None
+    
     secret = get_jwt_secret()
     if not secret:
         logger.warning("JWT_SECRET_KEY not set. Cannot verify token.")

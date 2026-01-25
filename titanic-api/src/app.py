@@ -8,9 +8,19 @@ from sqlalchemy import text
 from .config import app_config
 from .models import db
 from .views.people import people_api as people
-from .views.auth import auth_api as auth
 
 logger = logging.getLogger(__name__)
+
+AUTH_AVAILABLE = False
+auth = None
+
+try:
+    from .views.auth import auth_api as auth
+    AUTH_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Auth module not available: {e}. Running without authentication.")
+except Exception as e:
+    logger.warning(f"Auth module failed to load: {e}. Running without authentication.")
 
 OBSERVABILITY_AVAILABLE = False
 http_requests_total = None
@@ -101,7 +111,8 @@ def create_app(env_name: str) -> Flask:
             logger.warning(f"Could not create tables: {str(e)}")
 
     app.register_blueprint(people, url_prefix="/")
-    app.register_blueprint(auth, url_prefix="/")
+    if AUTH_AVAILABLE:
+        app.register_blueprint(auth, url_prefix="/")
 
     @app.route("/", methods=["GET"])
     def index():

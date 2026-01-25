@@ -63,6 +63,9 @@ def login() -> Response:
             },
             200,
         )
+    except ValueError as e:
+        logger.error(f"Login failed - JWT not available: {e}")
+        return custom_response({"error": "Authentication unavailable", "message": "JWT authentication is not configured. Please install PyJWT and set JWT_SECRET_KEY."}, 503)
     except Exception as e:
         logger.error(f"Login failed: {e}")
         return custom_response({"error": "Login failed", "message": str(e)}, 500)
