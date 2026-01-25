@@ -102,6 +102,22 @@ jobs:
             echo "⚠️ ClusterSecretStore not found. It will be created by Helm hooks."
           fi
 
+      - name: Fix existing secret Helm ownership (if exists)
+        run: |
+          SECRET_NAME="titanic-api-staging-secrets"
+          if kubectl get secret "$SECRET_NAME" -n ${{ env.K8S_NAMESPACE }} &>/dev/null; then
+            echo "Existing secret found. Adding Helm ownership metadata..."
+            kubectl label secret "$SECRET_NAME" -n ${{ env.K8S_NAMESPACE }} \
+              app.kubernetes.io/managed-by=Helm --overwrite || true
+            kubectl annotate secret "$SECRET_NAME" -n ${{ env.K8S_NAMESPACE }} \
+              meta.helm.sh/release-name=titanic-api-staging \
+              meta.helm.sh/release-namespace=${{ env.K8S_NAMESPACE }} \
+              --overwrite || true
+            echo "✓ Helm ownership metadata added to existing secret"
+          else
+            echo "No existing secret found. ExternalSecret will create it with Helm labels."
+          fi
+
       - name: Deploy to Kubernetes using Helm
         id: helm-deploy
         run: |

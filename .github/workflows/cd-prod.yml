@@ -109,6 +109,37 @@ jobs:
         run: |
           kubectl get deployment titanic-api-prod -n ${{ env.K8S_NAMESPACE }} -o yaml > deployment-backup-$(date +%Y%m%d-%H%M%S).yaml || echo "No existing deployment found"
 
+      - name: Wait for ClusterSecretStore to be ready
+        run: |
+          echo "Checking if ClusterSecretStore exists..."
+          if kubectl get clustersecretstore aws-secrets-manager &>/dev/null; then
+            echo "ClusterSecretStore exists, checking readiness..."
+            READY=$(kubectl get clustersecretstore aws-secrets-manager -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
+            if [ "$READY" == "True" ]; then
+              echo "✓ ClusterSecretStore is ready"
+            else
+              echo "⚠️ ClusterSecretStore may not be ready, but proceeding..."
+            fi
+          else
+            echo "⚠️ ClusterSecretStore not found. It will be created by Helm hooks."
+          fi
+
+      - name: Fix existing secret Helm ownership (if exists)
+        run: |
+          SECRET_NAME="titanic-api-prod-secrets"
+          if kubectl get secret "$SECRET_NAME" -n ${{ env.K8S_NAMESPACE }} &>/dev/null; then
+            echo "Existing secret found. Adding Helm ownership metadata..."
+            kubectl label secret "$SECRET_NAME" -n ${{ env.K8S_NAMESPACE }} \
+              app.kubernetes.io/managed-by=Helm --overwrite || true
+            kubectl annotate secret "$SECRET_NAME" -n ${{ env.K8S_NAMESPACE }} \
+              meta.helm.sh/release-name=titanic-api-prod \
+              meta.helm.sh/release-namespace=${{ env.K8S_NAMESPACE }} \
+              --overwrite || true
+            echo "✓ Helm ownership metadata added to existing secret"
+          else
+            echo "No existing secret found. ExternalSecret will create it with Helm labels."
+          fi
+
       - name: Deploy to Kubernetes using Helm
         id: deploy
         run: |
