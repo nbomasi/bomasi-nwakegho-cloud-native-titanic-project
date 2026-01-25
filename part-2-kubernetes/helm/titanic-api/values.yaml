@@ -223,8 +223,8 @@ externalSecrets:
     name: aws-secrets-manager
     region: eu-west-2
     serviceAccount:
-      name: external-secrets
-      namespace: external-secrets
+      name: external-secrets-operator
+      namespace: external-secrets-system
   externalSecret:
     enabled: true
     secretName: titanic-api-prod-rds-credentials
