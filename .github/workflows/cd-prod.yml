@@ -41,8 +41,8 @@ jobs:
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
           else
-            # Use specific tag: main-099f7ac
-            echo "tag=main-099f7ac" >> $GITHUB_OUTPUT
+            # Use latest tag
+            echo "tag=latest" >> $GITHUB_OUTPUT
           fi
 
       - name: Configure AWS credentials for image verification
