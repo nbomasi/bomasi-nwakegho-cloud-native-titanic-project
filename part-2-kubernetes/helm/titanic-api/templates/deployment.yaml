@@ -50,7 +50,7 @@ spec:
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
-              name: {{ include "titanic-api.fullname" . }}-secrets
+              name: {{ if .Values.externalSecrets.externalSecret.enabled }}{{ .Values.externalSecrets.externalSecret.targetSecretName }}{{ else }}{{ include "titanic-api.fullname" . }}-secrets{{ end }}
               key: database-url
         - name: FLASK_ENV
           valueFrom:
@@ -60,7 +60,7 @@ spec:
         - name: JWT_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              name: {{ include "titanic-api.fullname" . }}-secrets
+              name: {{ if .Values.externalSecrets.externalSecret.enabled }}{{ .Values.externalSecrets.externalSecret.targetSecretName }}{{ else }}{{ include "titanic-api.fullname" . }}-secrets{{ end }}
               key: jwt-secret-key
         livenessProbe:
           {{- toYaml .Values.livenessProbe | nindent 10 }}
