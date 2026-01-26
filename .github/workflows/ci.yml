@@ -48,28 +48,26 @@ jobs:
         id: check-dir
         run: |
           if [ ! -d "titanic-api" ]; then
-            echo "⚠️ Warning: titanic-api directory not found"
+            echo "Error: titanic-api directory not found"
             echo "Current directory structure:"
             ls -la
             echo ""
-            echo "Skipping test job - titanic-api directory is required for tests"
+            echo "Please ensure the titanic-api code is in the repository"
             echo "If it's a git submodule, ensure it's initialized:"
             echo "  git submodule update --init --recursive"
             echo "directory_exists=false" >> $GITHUB_OUTPUT
-          else
-            echo "✓ titanic-api directory found"
-            ls -la titanic-api/
-            echo "directory_exists=true" >> $GITHUB_OUTPUT
+            exit 1
           fi
+          echo "titanic-api directory found"
+          ls -la titanic-api/
+          echo "directory_exists=true" >> $GITHUB_OUTPUT
 
       - name: Set up Python
-        if: steps.check-dir.outputs.directory_exists == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Cache pip dependencies
-        if: steps.check-dir.outputs.directory_exists == 'true'
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
@@ -78,7 +76,6 @@ jobs:
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
-        if: steps.check-dir.outputs.directory_exists == 'true'
         working-directory: ./titanic-api
         run: |
           python -m pip install --upgrade pip
@@ -86,14 +83,12 @@ jobs:
           pip install pytest pytest-cov pytest-flask flake8 black isort mypy
 
       - name: Run linter (flake8)
-        if: steps.check-dir.outputs.directory_exists == 'true'
         working-directory: ./titanic-api
         run: |
           flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
           flake8 src/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
       - name: Check code formatting (black)
-        if: steps.check-dir.outputs.directory_exists == 'true'
         working-directory: ./titanic-api
         run: |
           black --check --diff src/ 2>&1 | head -100 || true
@@ -101,20 +96,17 @@ jobs:
         continue-on-error: true
 
       - name: Check import sorting (isort)
-        if: steps.check-dir.outputs.directory_exists == 'true'
         working-directory: ./titanic-api
         run: |
           isort --check-only src/ || echo "⚠️ Import sorting check failed"
         continue-on-error: true
 
       - name: Type checking (mypy)
-        if: steps.check-dir.outputs.directory_exists == 'true'
         working-directory: ./titanic-api
         run: |
           mypy src/ --ignore-missing-imports || true
 
       - name: Run unit tests
-        if: steps.check-dir.outputs.directory_exists == 'true'
         working-directory: ./titanic-api
         env:
           DATABASE_URL: postgresql+psycopg2://titanic_user:test_password@localhost:5432/titanic_db
@@ -123,8 +115,8 @@ jobs:
           pytest tests/ -v --cov=src --cov-report=xml --cov-report=html --cov-report=term || true
 
       - name: Upload coverage reports
-        if: always() && steps.check-dir.outputs.directory_exists == 'true'
         uses: codecov/codecov-action@v4
+        if: always()
         with:
           file: ./titanic-api/coverage.xml
           flags: unittests
@@ -132,7 +124,6 @@ jobs:
           fail_ci_if_error: false
 
       - name: Check coverage threshold
-        if: steps.check-dir.outputs.directory_exists == 'true'
         working-directory: ./titanic-api
         run: |
           coverage=$(pytest tests/ --cov=src --cov-report=term-missing | grep TOTAL | awk '{print $NF}' | sed 's/%//')
@@ -143,12 +134,6 @@ jobs:
           fi
           echo "Coverage $coverage% meets threshold of $threshold%"
         continue-on-error: true
-
-      - name: Skip message if directory missing
-        if: steps.check-dir.outputs.directory_exists != 'true'
-        run: |
-          echo "⚠️ Test job skipped - titanic-api directory not found"
-          echo "To enable tests, add the titanic-api directory to your repository"
 
   security-scan:
     name: Security Scanning
@@ -166,7 +151,7 @@ jobs:
         id: check-dir
         run: |
           if [ ! -d "titanic-api" ]; then
-            echo "⚠️ Warning: titanic-api directory not found"
+            echo "Error: titanic-api directory not found"
             echo "Current directory structure:"
             ls -la
             echo ""
@@ -174,16 +159,10 @@ jobs:
             echo "If it's a git submodule, ensure it's initialized:"
             echo "  git submodule update --init --recursive"
             echo "directory_exists=false" >> $GITHUB_OUTPUT
-          else
-            echo "✓ titanic-api directory found, proceeding with security scan"
-            echo "directory_exists=true" >> $GITHUB_OUTPUT
+            exit 1
           fi
-
-      - name: Skip message if directory missing
-        if: steps.check-dir.outputs.directory_exists != 'true'
-        run: |
-          echo "⚠️ Security scan job skipped - titanic-api directory not found"
-          echo "To enable security scanning, add the titanic-api directory to your repository"
+          echo "titanic-api directory found, proceeding with security scan"
+          echo "directory_exists=true" >> $GITHUB_OUTPUT
 
       - name: Run Trivy vulnerability scanner
         if: steps.check-dir.outputs.directory_exists == 'true'
@@ -344,3 +323,4 @@ jobs:
           echo "CI Pipeline failed. Check the workflow run for details."
           # Add Slack/Email notification here if configured
           # Example: curl -X POST -H 'Content-type: application/json' --data '{"text":"CI Pipeline failed"}' ${{ secrets.SLACK_WEBHOOK_URL }}
+#
