@@ -1,5 +1,6 @@
 import logging
 import os
+import threading
 import time
 
 from flask import Flask, request
@@ -110,13 +111,20 @@ def create_app(env_name: str) -> Flask:
 
         return response
 
-    # Create tables if they don't exist
-    with app.app_context():
-        try:
-            db.create_all()
-            logger.info("Database tables created/verified")
-        except Exception as e:
-            logger.warning(f"Could not create tables: {str(e)}")
+    # Create tables if they don't exist (run in background to avoid blocking startup)
+    def create_tables_background():
+        """Create database tables in background thread"""
+        with app.app_context():
+            try:
+                db.create_all()
+                logger.info("Database tables created/verified")
+            except Exception as e:
+                logger.warning(f"Could not create tables: {str(e)}")
+
+    # Start table creation in background thread (daemon so it doesn't prevent shutdown)
+    table_thread = threading.Thread(target=create_tables_background, daemon=True)
+    table_thread.start()
+    logger.info("Database table creation started in background thread")
 
     app.register_blueprint(people, url_prefix="/")
     if AUTH_AVAILABLE:
