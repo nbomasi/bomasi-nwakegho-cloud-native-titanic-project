@@ -323,4 +323,3 @@ jobs:
           echo "CI Pipeline failed. Check the workflow run for details."
           # Add Slack/Email notification here if configured
           # Example: curl -X POST -H 'Content-type: application/json' --data '{"text":"CI Pipeline failed"}' ${{ secrets.SLACK_WEBHOOK_URL }}
-#

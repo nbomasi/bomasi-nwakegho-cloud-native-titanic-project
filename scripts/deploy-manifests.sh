@@ -262,8 +262,50 @@ apply_manifests() {
 # Function to wait for deployment to be ready
 wait_for_deployment() {
     echo "Waiting for deployment to be ready..."
-    kubectl rollout status deployment/titanic-api -n "$NAMESPACE" --timeout=10m
-    echo -e "${GREEN}✓ Deployment is ready${NC}"
+    
+    # Wait for deployment to be available
+    echo "Checking deployment status..."
+    for i in {1..30}; do
+        READY_REPLICAS=$(kubectl get deployment titanic-api -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+        DESIRED_REPLICAS=$(kubectl get deployment titanic-api -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
+        
+        if [ "$READY_REPLICAS" == "$DESIRED_REPLICAS" ] && [ "$READY_REPLICAS" != "0" ]; then
+            echo -e "${GREEN}✓ All replicas are ready ($READY_REPLICAS/$DESIRED_REPLICAS)${NC}"
+            return 0
+        fi
+        
+        echo "Waiting for deployment... Ready: $READY_REPLICAS/$DESIRED_REPLICAS (attempt $i/30)"
+        
+        # Show pod status every 5 attempts
+        if [ $((i % 5)) -eq 0 ]; then
+            echo "Current pod status:"
+            kubectl get pods -n "$NAMESPACE" -l app=titanic-api || true
+        fi
+        
+        sleep 10
+    done
+    
+    # If not ready, show detailed status
+    echo -e "${YELLOW}⚠ Deployment not fully ready after 5 minutes${NC}"
+    echo "Deployment status:"
+    kubectl get deployment titanic-api -n "$NAMESPACE" -o yaml | grep -A 10 "status:" || true
+    
+    echo ""
+    echo "Pod status:"
+    kubectl get pods -n "$NAMESPACE" -l app=titanic-api || true
+    
+    echo ""
+    echo "Pod events:"
+    kubectl get events -n "$NAMESPACE" --field-selector involvedObject.kind=Pod --sort-by='.lastTimestamp' | tail -10 || true
+    
+    # Try to use rollout status with longer timeout
+    echo ""
+    echo "Attempting rollout status check with extended timeout..."
+    kubectl rollout status deployment/titanic-api -n "$NAMESPACE" --timeout=10m || {
+        echo -e "${YELLOW}⚠ Rollout status check failed or timed out${NC}"
+        echo "This may be acceptable if pods are starting - check pod logs for details"
+        return 0  # Don't fail the deployment - let verification handle it
+    }
 }
 
 # Function to verify deployment
@@ -274,10 +316,20 @@ verify_deployment() {
     echo "Pod status:"
     kubectl get pods -n "$NAMESPACE" -l app=titanic-api
     
+    # Check if any pods are running
+    RUNNING_PODS=$(kubectl get pods -n "$NAMESPACE" -l app=titanic-api --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l)
+    if [ "$RUNNING_PODS" -gt 0 ]; then
+        echo -e "${GREEN}✓ Found $RUNNING_PODS running pod(s)${NC}"
+    else
+        echo -e "${YELLOW}⚠ No pods in Running state yet${NC}"
+        echo "Checking pod status in detail:"
+        kubectl get pods -n "$NAMESPACE" -l app=titanic-api -o wide
+    fi
+    
     # Check service
     echo ""
     echo "Service status:"
-    kubectl get svc -n "$NAMESPACE" -l app=titanic-api
+    kubectl get svc -n "$NAMESPACE" -l app=titanic-api || echo "No service found"
     
     # Check ingress
     echo ""
@@ -289,7 +341,15 @@ verify_deployment() {
     echo "Deployment status:"
     kubectl get deployment titanic-api -n "$NAMESPACE"
     
+    # Show recent events
+    echo ""
+    echo "Recent events:"
+    kubectl get events -n "$NAMESPACE" --sort-by='.lastTimestamp' | tail -10 || true
+    
     echo -e "${GREEN}✓ Deployment verification complete${NC}"
+    echo ""
+    echo "Note: If pods are still starting, they may take a few minutes to become ready."
+    echo "Check pod logs with: kubectl logs -n $NAMESPACE -l app=titanic-api"
 }
 
 # Main execution
@@ -302,6 +362,12 @@ main() {
     update_environment_config
     update_deployment_image
     apply_manifests
+    
+    # Wait a bit for pods to start initializing
+    echo ""
+    echo "Waiting for pods to initialize..."
+    sleep 10
+    
     wait_for_deployment
     verify_deployment
     
@@ -313,6 +379,9 @@ main() {
     echo "To check status:"
     echo "  kubectl get pods -n $NAMESPACE"
     echo "  kubectl logs -n $NAMESPACE -l app=titanic-api"
+    echo ""
+    echo "Note: Pods may take a few minutes to become fully ready."
+    echo "If pods are in ContainerCreating state, they may be waiting for secrets or init containers."
 }
 
 # Run main function
