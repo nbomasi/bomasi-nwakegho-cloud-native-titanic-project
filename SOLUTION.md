@@ -1,5 +1,7 @@
 # Cloud-Native Titanic API - Solution Summary
 
+> **Note:** For a quick overview, see [README.md](./README.md). This document provides comprehensive details of the complete implementation.
+
 ## Executive Summary
 
 This repository contains a complete cloud-native implementation of the Titanic API, transforming a basic Flask application into a production-ready, scalable, and secure microservice deployed on AWS EKS. The solution demonstrates comprehensive DevOps practices including containerization, Kubernetes orchestration, CI/CD pipelines, observability, security controls, infrastructure as code, and disaster recovery strategies.
@@ -346,6 +348,7 @@ cloud-native-titanic/
 
 ## References
 
+- [README.md](./README.md) - Project overview and quick start
 - [Part 1 Documentation](./part-1-containerization/CONTAINERIZATION.md)
 - [Part 2 Documentation](./part-2-kubernetes/KUBERNETES.md)
 - [Part 3 Documentation](./part-3-cicd/CICD.md)
