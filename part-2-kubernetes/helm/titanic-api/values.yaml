@@ -71,13 +71,22 @@ ingress:
       hosts:
         - titanic-api.iyere.site
 
+grafanaIngress:
+  enabled: true
+  name: grafana-ingress
+  namespace: monitoring
+  host: monitoring.iyere.site
+  tlsSecretName: grafana-tls
+  serviceName: kube-prometheus-stack-grafana
+  servicePort: 80
+
 resources:
   requests:
     cpu: 100m
-    memory: 256Mi
+    memory: 512Mi
   limits:
     cpu: 500m
-    memory: 512Mi
+    memory: 1Gi
 
 autoscaling:
   enabled: true
@@ -125,16 +134,16 @@ resourceQuota:
     cpu: "4"
     memory: 8Gi
   persistentvolumeclaims: "1"
-  servicesLoadbalancers: "1"
+  servicesLoadbalancers: "0"
 
 limitRange:
   enabled: true
   default:
     cpu: 500m
-    memory: 512Mi
+    memory: 1Gi
   defaultRequest:
     cpu: 100m
-    memory: 256Mi
+    memory: 512Mi
 
 livenessProbe:
   httpGet:
@@ -215,7 +224,7 @@ certManager:
     enabled: false
     name: letsencrypt-prod
     server: https://acme-v02.api.letsencrypt.org/directory
-    email: admin@iyere.site
+    email: nbomasi@gmail.com
 
 externalSecrets:
   secretStore:

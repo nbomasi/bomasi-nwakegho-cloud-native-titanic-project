@@ -575,32 +575,13 @@ The following limitations are acknowledged and will be addressed in subsequent p
 
 ## References
 
-### Docker Documentation
-- Docker Official Documentation: https://docs.docker.com/
-- Dockerfile Best Practices: https://docs.docker.com/develop/develop-images/dockerfile_best-practices/
-- Multi-stage Builds: https://docs.docker.com/build/building/multi-stage/
-- Docker Compose Documentation: https://docs.docker.com/compose/
-- Docker Security Best Practices: https://docs.docker.com/engine/security/
-
-### Python and Flask
-- Flask Documentation: https://flask.palletsprojects.com/
-- Gunicorn Documentation: https://docs.gunicorn.org/
-- Python Best Practices: https://docs.python-guide.org/
-- PEP 8 Style Guide: https://pep8.org/
-
-### PostgreSQL
-- PostgreSQL Official Documentation: https://www.postgresql.org/docs/
-- PostgreSQL Docker Image: https://hub.docker.com/_/postgres
-
-### Security
-- OWASP Docker Security: https://owasp.org/www-project-docker-security/
-- CIS Docker Benchmark: https://www.cisecurity.org/benchmark/docker
-- Container Security Best Practices: https://kubernetes.io/docs/concepts/security/pod-security-standards/
-
-### Best Practices
-- The Twelve-Factor App: https://12factor.net/
-- Container Image Best Practices: https://cloud.google.com/containers/docs/best-practices
-- Docker Layer Caching: https://docs.docker.com/build/cache/
+- [Docker Official Documentation](https://docs.docker.com/)
+- [Dockerfile Best Practices](https://docs.docker.com/develop/develop-images/dockerfile_best-practices/)
+- [Docker Compose Documentation](https://docs.docker.com/compose/)
+- [Flask Documentation](https://flask.palletsprojects.com/)
+- [Gunicorn Documentation](https://docs.gunicorn.org/)
+- [PostgreSQL Official Documentation](https://www.postgresql.org/docs/)
+- [Docker Security Best Practices](https://docs.docker.com/engine/security/)
 
 ## Conclusion
 

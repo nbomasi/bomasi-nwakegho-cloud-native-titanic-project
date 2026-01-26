@@ -20,14 +20,12 @@ spec:
     - protocol: TCP
       port: 5000
   egress:
-  - to:
-    - podSelector:
-        matchLabels:
-          app: titanic-api
-          component: database
+  # Allow egress to RDS (PostgreSQL on port 5432)
+  - to: []
     ports:
     - protocol: TCP
       port: 5432
+  # Allow DNS resolution
   - to:
     - namespaceSelector: {}
     ports:
@@ -35,38 +33,8 @@ spec:
       port: 53
     - protocol: UDP
       port: 53
-
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: titanic-db-network-policy
-  namespace: titanic-api
-  labels:
-    app: titanic-api
-    component: database
-spec:
-  podSelector:
-    matchLabels:
-      app: titanic-api
-      component: database
-  policyTypes:
-  - Ingress
-  - Egress
-  ingress:
-  - from:
-    - podSelector:
-        matchLabels:
-          app: titanic-api
-          component: api
+  # Allow HTTPS for external API calls
+  - to: []
     ports:
     - protocol: TCP
-      port: 5432
-  egress:
-  - to:
-    - namespaceSelector: {}
-    ports:
-    - protocol: TCP
-      port: 53
-    - protocol: UDP
-      port: 53
+      port: 443

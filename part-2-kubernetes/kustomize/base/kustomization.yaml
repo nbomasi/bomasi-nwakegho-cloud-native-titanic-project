@@ -5,10 +5,12 @@ namespace: titanic-api
 
 resources:
   - ../../manifests/deployment.yaml
-  - ../../manifests/service.yaml
+  - ../../manifests/service.yaml  # ClusterIP service only (ingress handles external access)
   - ../../manifests/configmap.yaml
-  - ../../manifests/secret.yaml
-  - ../../manifests/pvc.yaml
+  # Note: secret.yaml is for reference only - ExternalSecret creates the actual secret from AWS Secrets Manager
+  # - ../../manifests/secret.yaml
+  # PVC removed - using RDS instead of pod-based database
+  # - ../../manifests/pvc.yaml
   - ../../manifests/hpa.yaml
   - ../../manifests/pdb.yaml
   - ../../manifests/networkpolicy.yaml
@@ -17,6 +19,7 @@ resources:
   - ../../manifests/clusterissuer.yaml
   - ../../manifests/secretstore.yaml
   - ../../manifests/externalsecret.yaml
+  - ../../manifests/grafana-ingress.yaml
 
 commonLabels:
   app: titanic-api

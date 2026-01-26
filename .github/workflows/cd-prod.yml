@@ -100,82 +100,36 @@ jobs:
 
       - name: Create backup of current deployment
         run: |
-          kubectl get deployment titanic-api-prod -n ${{ env.K8S_NAMESPACE }} -o yaml > deployment-backup-$(date +%Y%m%d-%H%M%S).yaml || echo "No existing deployment found"
+          kubectl get deployment titanic-api -n ${{ env.K8S_NAMESPACE }} -o yaml > deployment-backup-$(date +%Y%m%d-%H%M%S).yaml || echo "No existing deployment found"
 
-      - name: Wait for ClusterSecretStore to be ready
-        run: |
-          echo "Checking if ClusterSecretStore exists..."
-          if kubectl get clustersecretstore aws-secrets-manager &>/dev/null; then
-            echo "ClusterSecretStore exists, checking readiness..."
-            READY=$(kubectl get clustersecretstore aws-secrets-manager -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
-            if [ "$READY" == "True" ]; then
-              echo "✓ ClusterSecretStore is ready"
-            else
-              echo "⚠️ ClusterSecretStore may not be ready, but proceeding..."
-            fi
-          else
-            echo "⚠️ ClusterSecretStore not found. It will be created by Helm hooks."
-          fi
-
-      - name: Fix existing secret Helm ownership (if exists)
-        run: |
-          SECRET_NAME="titanic-api-prod-secrets"
-          if kubectl get secret "$SECRET_NAME" -n ${{ env.K8S_NAMESPACE }} &>/dev/null; then
-            echo "Existing secret found. Adding Helm ownership metadata..."
-            kubectl label secret "$SECRET_NAME" -n ${{ env.K8S_NAMESPACE }} \
-              app.kubernetes.io/managed-by=Helm --overwrite || true
-            kubectl annotate secret "$SECRET_NAME" -n ${{ env.K8S_NAMESPACE }} \
-              meta.helm.sh/release-name=titanic-api-prod \
-              meta.helm.sh/release-namespace=${{ env.K8S_NAMESPACE }} \
-              --overwrite || true
-            echo "✓ Helm ownership metadata added to existing secret"
-          else
-            echo "No existing secret found. ExternalSecret will create it with Helm labels."
-          fi
-
-      - name: Deploy to Kubernetes using Helm
+      - name: Deploy to Kubernetes using Manifests
         id: deploy
+        env:
+          ECR_REPOSITORY_URL: ${{ env.ECR_REPOSITORY_URL }}
         run: |
-          helm upgrade --install titanic-api-prod \
-            ./part-2-kubernetes/helm/titanic-api \
-            --namespace ${{ env.K8S_NAMESPACE }} \
-            --create-namespace \
-            --set image.repository=${{ env.ECR_REPOSITORY_URL }} \
-            --set image.tag=${{ needs.pre-deployment-checks.outputs.image_tag }} \
-            --set image.pullPolicy=Always \
-            --set namespace=${{ env.K8S_NAMESPACE }} \
-            --set config.flaskEnv=production \
-            --set replicaCount=2 \
-            --set autoscaling.enabled=true \
-            --set autoscaling.minReplicas=2 \
-            --set autoscaling.maxReplicas=10 \
-            --set ingress.enabled=true \
-            --set ingress.hosts[0].host=titanic-api.iyere.site \
-            --set ingress.annotations."cert-manager\.io/cluster-issuer"=letsencrypt-prod \
-            --set ingress.hosts[0].paths[0].path=/ \
-            --set ingress.hosts[0].paths[0].pathType=Prefix \
-            --set ingress.hosts[0].paths[1].path=/health \
-            --set ingress.hosts[0].paths[1].pathType=Exact \
-            --set ingress.hosts[0].paths[2].path=/people \
-            --set ingress.hosts[0].paths[2].pathType=Prefix \
-            --set podDisruptionBudget.enabled=true \
-            --set podDisruptionBudget.minAvailable=1 \
-            --set externalSecrets.externalSecret.enabled=true \
-            --set externalSecrets.secretStore.enabled=true \
-            --wait \
-            --timeout 15m \
-            --atomic
+          chmod +x ./scripts/deploy-manifests.sh
+          ./scripts/deploy-manifests.sh \
+            ${{ env.K8S_NAMESPACE }} \
+            ${{ needs.pre-deployment-checks.outputs.image_tag }} \
+            ${{ env.K8S_ENVIRONMENT }} || {
+              echo "Deployment failed, gathering diagnostics..."
+              kubectl get pods -n ${{ env.K8S_NAMESPACE }} -l app=titanic-api
+              kubectl describe pods -n ${{ env.K8S_NAMESPACE }} -l app=titanic-api
+              kubectl logs -n ${{ env.K8S_NAMESPACE }} -l app=titanic-api --tail=100 || true
+              kubectl get events -n ${{ env.K8S_NAMESPACE }} --sort-by='.lastTimestamp' | tail -20
+              exit 1
+            }
 
       - name: Verify deployment
         run: |
-          kubectl rollout status deployment/titanic-api-prod -n ${{ env.K8S_NAMESPACE }} --timeout=15m
+          kubectl rollout status deployment/titanic-api -n ${{ env.K8S_NAMESPACE }} --timeout=15m
           kubectl get pods -n ${{ env.K8S_NAMESPACE }}
           kubectl get svc -n ${{ env.K8S_NAMESPACE }}
           kubectl get ingress -n ${{ env.K8S_NAMESPACE }}
 
       - name: Run production smoke tests
         run: |
-          SERVICE_URL=$(kubectl get ingress -n ${{ env.K8S_NAMESPACE }} titanic-api-prod -o jsonpath='{.spec.rules[0].host}')
+          SERVICE_URL=$(kubectl get ingress -n ${{ env.K8S_NAMESPACE }} titanic-api-ingress -o jsonpath='{.spec.rules[0].host}')
           if [ -n "$SERVICE_URL" ]; then
             echo "Running production smoke tests against $SERVICE_URL"
             # Health check
@@ -189,8 +143,8 @@ jobs:
           echo "Monitoring deployment for 2 minutes..."
           for i in {1..12}; do
             sleep 10
-            READY=$(kubectl get deployment titanic-api-prod -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.status.readyReplicas}')
-            DESIRED=$(kubectl get deployment titanic-api-prod -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.spec.replicas}')
+            READY=$(kubectl get deployment titanic-api -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.status.readyReplicas}')
+            DESIRED=$(kubectl get deployment titanic-api -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.spec.replicas}')
             echo "Ready: $READY/$DESIRED replicas"
             if [ "$READY" == "$DESIRED" ] && [ "$READY" != "0" ]; then
               echo "All replicas are ready"
@@ -232,14 +186,14 @@ jobs:
       - name: Rollback deployment
         run: |
           echo "Rolling back production deployment..."
-          helm rollback titanic-api-prod -n ${{ env.K8S_NAMESPACE }} --wait --timeout 15m
-          kubectl rollout status deployment/titanic-api-prod -n ${{ env.K8S_NAMESPACE }} --timeout=5m
+          kubectl rollout undo deployment/titanic-api -n ${{ env.K8S_NAMESPACE }} --timeout=15m
+          kubectl rollout status deployment/titanic-api -n ${{ env.K8S_NAMESPACE }} --timeout=5m
           echo "Rollback completed successfully"
 
       - name: Verify rollback
         run: |
           kubectl get pods -n ${{ env.K8S_NAMESPACE }}
-          kubectl rollout status deployment/titanic-api-prod -n ${{ env.K8S_NAMESPACE }}
+          kubectl rollout status deployment/titanic-api -n ${{ env.K8S_NAMESPACE }}
 
       - name: Notify rollback
         run: |

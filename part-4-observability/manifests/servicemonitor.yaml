@@ -2,14 +2,15 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: titanic-api
-  namespace: titanic-api-prod
+  namespace: titanic-api
   labels:
     app: titanic-api
-    release: prometheus
+    release: kube-prometheus-stack
 spec:
   selector:
     matchLabels:
       app: titanic-api
+      component: api
   endpoints:
   - port: http
     path: /metrics

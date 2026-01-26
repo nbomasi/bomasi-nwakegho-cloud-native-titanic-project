@@ -1,0 +1,33 @@
+{{- if .Values.grafanaIngress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Values.grafanaIngress.name }}
+  namespace: {{ .Values.grafanaIngress.namespace }}
+  labels:
+    {{- include "titanic-api.labels" . | nindent 4 }}
+    app: grafana
+  annotations:
+    kubernetes.io/ingress.class: {{ .Values.ingress.className }}
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    cert-manager.io/cluster-issuer: {{ .Values.certManager.clusterIssuer.name }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+  - hosts:
+    - {{ .Values.grafanaIngress.host }}
+    secretName: {{ .Values.grafanaIngress.tlsSecretName }}
+  rules:
+  - host: {{ .Values.grafanaIngress.host | quote }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ .Values.grafanaIngress.serviceName }}
+            port:
+              number: {{ .Values.grafanaIngress.servicePort }}
+{{- end }}

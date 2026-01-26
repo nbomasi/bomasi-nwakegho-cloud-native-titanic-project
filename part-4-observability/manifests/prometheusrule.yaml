@@ -2,10 +2,10 @@ apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
   name: titanic-api-alerts
-  namespace: titanic-api-prod
+  namespace: titanic-api
   labels:
     app: titanic-api
-    release: prometheus
+    release: kube-prometheus-stack
 spec:
   groups:
   - name: titanic-api.rules

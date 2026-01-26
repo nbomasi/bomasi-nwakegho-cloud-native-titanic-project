@@ -33,8 +33,8 @@ spec:
           type: RuntimeDefault
       containers:
       - name: api
-        image: titanic-api:latest
-        imagePullPolicy: IfNotPresent
+        image: 456128143446.dkr.ecr.eu-west-2.amazonaws.com/titanic-api/titanic-api-repo:latest
+        imagePullPolicy: Always
         ports:
         - name: http
           containerPort: 5000
@@ -58,18 +58,18 @@ spec:
         resources:
           requests:
             cpu: 100m
-            memory: 256Mi
+            memory: 512Mi
           limits:
             cpu: 500m
-            memory: 512Mi
+            memory: 1Gi
         livenessProbe:
           httpGet:
             path: /health
             port: http
             scheme: HTTP
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          timeoutSeconds: 5
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
           failureThreshold: 3
           successThreshold: 1
         readinessProbe:
@@ -77,9 +77,9 @@ spec:
             path: /health
             port: http
             scheme: HTTP
-          initialDelaySeconds: 10
-          periodSeconds: 5
-          timeoutSeconds: 3
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 10
           failureThreshold: 3
           successThreshold: 1
         securityContext:
@@ -101,86 +101,3 @@ spec:
       - name: app-data
         emptyDir: {}
       terminationGracePeriodSeconds: 30
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: titanic-db
-  namespace: titanic-api
-  labels:
-    app: titanic-api
-    component: database
-spec:
-  replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app: titanic-api
-      component: database
-  template:
-    metadata:
-      labels:
-        app: titanic-api
-        component: database
-    spec:
-      containers:
-      - name: postgres
-        image: postgres:15-alpine
-        ports:
-        - name: postgres
-          containerPort: 5432
-          protocol: TCP
-        env:
-        - name: POSTGRES_USER
-          valueFrom:
-            secretKeyRef:
-              name: titanic-secrets
-              key: postgres-user
-        - name: POSTGRES_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: titanic-secrets
-              key: postgres-password
-        - name: POSTGRES_DB
-          valueFrom:
-            configMapKeyRef:
-              name: titanic-config
-              key: postgres-db
-        - name: PGDATA
-          value: /var/lib/postgresql/data/pgdata
-        resources:
-          requests:
-            cpu: 200m
-            memory: 512Mi
-          limits:
-            cpu: 1000m
-            memory: 2Gi
-        livenessProbe:
-          exec:
-            command:
-            - /bin/sh
-            - -c
-            - pg_isready -U $(POSTGRES_USER) -d $(POSTGRES_DB)
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
-        readinessProbe:
-          exec:
-            command:
-            - /bin/sh
-            - -c
-            - pg_isready -U $(POSTGRES_USER) -d $(POSTGRES_DB)
-          initialDelaySeconds: 10
-          periodSeconds: 5
-          timeoutSeconds: 3
-          failureThreshold: 3
-        volumeMounts:
-        - name: postgres-data
-          mountPath: /var/lib/postgresql/data
-      volumes:
-      - name: postgres-data
-        persistentVolumeClaim:
-          claimName: postgres-pvc
