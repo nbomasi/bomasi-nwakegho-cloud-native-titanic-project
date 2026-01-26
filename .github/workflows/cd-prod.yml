@@ -1,4 +1,4 @@
-name: CD - Production Deployment
+name: CD Pipeline - Production Deployment
 
 on:
   workflow_dispatch:

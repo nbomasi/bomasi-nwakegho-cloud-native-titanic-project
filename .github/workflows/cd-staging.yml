@@ -1,8 +1,8 @@
-name: CD - Staging Deployment
+name: CD Pipeline - Staging Deployment
 
 on:
   workflow_run:
-    workflows: ["CI Pipeline"]
+    workflows: ["CI Pipeline - Titanic API"]
     types:
       - completed
     branches: [ main ]
