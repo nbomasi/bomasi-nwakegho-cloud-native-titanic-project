@@ -55,7 +55,7 @@ jobs:
         env:
           DATABASE_URL: postgresql+psycopg2://titanic_user:test_password@localhost:5432/titanic_db
           FLASK_ENV: production
-        run: pytest tests -v
+        run: python -m pytest tests -v
 
   terraform:
     name: Validate Terraform
@@ -91,7 +91,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Scan filesystem with Trivy
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
