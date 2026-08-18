@@ -242,13 +242,14 @@ docker compose -f docker-compose.dev.yml down -v
 
 ### Production Mode
 
-**Set Environment Variables:**
+**Create Local Environment File:**
 ```bash
-export POSTGRES_USER=titanic_user
-export POSTGRES_PASSWORD=secure_password
-export POSTGRES_DB=titanic_db
-export JWT_SECRET_KEY=your-secret-key
+cp .env.example .env
+openssl rand -base64 24  # use the output for POSTGRES_PASSWORD
+openssl rand -hex 32     # use the output for JWT_SECRET_KEY
 ```
+
+Populate `.env` locally. Docker Compose refuses to start when either secret is missing, and `.env` is excluded from version control.
 
 **Start Services:**
 ```bash
@@ -275,11 +276,11 @@ docker compose down
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
 | `POSTGRES_USER` | PostgreSQL username | `titanic_user` | No |
-| `POSTGRES_PASSWORD` | PostgreSQL password | `titanic_password` | No |
+| `POSTGRES_PASSWORD` | PostgreSQL password | None | Yes |
 | `POSTGRES_DB` | Database name | `titanic_db` (prod), `postgres` (dev) | No |
 | `POSTGRES_PORT` | PostgreSQL port | `5432` | No |
 | `APP_PORT` | Application port | `5000` | No |
-| `JWT_SECRET_KEY` | JWT secret key | `change-me-in-production` | No |
+| `JWT_SECRET_KEY` | JWT signing key | None | Yes |
 | `FLASK_ENV` | Flask environment | `production` or `development` | No |
 
 ## Design Decisions

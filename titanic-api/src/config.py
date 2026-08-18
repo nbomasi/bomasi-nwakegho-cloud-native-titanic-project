@@ -17,10 +17,15 @@ def get_database_url():
 
     # Fallback: construct from individual environment variables
     postgres_user = os.getenv("POSTGRES_USER", "titanic_user")
-    postgres_password = os.getenv("POSTGRES_PASSWORD", "titanic_password")
+    postgres_password = os.getenv("POSTGRES_PASSWORD")
     postgres_db = os.getenv("POSTGRES_DB", "postgres")
     postgres_host = os.getenv("POSTGRES_HOST", "db")
     postgres_port = os.getenv("POSTGRES_PORT", "5432")
+
+    if not postgres_password:
+        raise RuntimeError(
+            "POSTGRES_PASSWORD is required when DATABASE_URL is not set"
+        )
 
     url = f"postgresql+psycopg2://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/{postgres_db}"
     import logging
