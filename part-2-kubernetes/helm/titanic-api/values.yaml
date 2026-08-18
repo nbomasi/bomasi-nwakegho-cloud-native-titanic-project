@@ -5,7 +5,7 @@ replicaCount: 2
 image:
   repository: titanic-api
   pullPolicy: IfNotPresent
-  tag: "latest"
+  tag: "set-by-deployment"
 
 imagePullSecrets: []
 
@@ -58,7 +58,7 @@ ingress:
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
   hosts:
-    - host: titanic-api.iyere.site
+    - host: titanic-api.example.com
       paths:
         - path: /
           pathType: Prefix
@@ -69,13 +69,13 @@ ingress:
   tls:
     - secretName: titanic-api-tls
       hosts:
-        - titanic-api.iyere.site
+        - titanic-api.example.com
 
 grafanaIngress:
   enabled: true
   name: grafana-ingress
   namespace: monitoring
-  host: monitoring.iyere.site
+  host: monitoring.example.com
   tlsSecretName: grafana-tls
   serviceName: kube-prometheus-stack-grafana
   servicePort: 80
@@ -177,13 +177,10 @@ config:
   logLevel: INFO
 
 secrets:
-  databaseUrl: ""
-  postgresUser: titanic_user
-  postgresPassword: ""
-  jwtSecretKey: ""
+  existingSecret: titanic-secrets
 
 database:
-  enabled: true
+  enabled: false
   image:
     repository: postgres
     tag: "15-alpine"
@@ -224,7 +221,7 @@ certManager:
     enabled: false
     name: letsencrypt-prod
     server: https://acme-v02.api.letsencrypt.org/directory
-    email: nbomasi@gmail.com
+    email: platform-team@example.com
 
 externalSecrets:
   secretStore:
@@ -236,6 +233,6 @@ externalSecrets:
       namespace: external-secrets-system
   externalSecret:
     enabled: true
-    secretName: titanic-api-prod-rds-credentials
+    secretName: replace-with-secrets-manager-name
     targetSecretName: titanic-secrets
     refreshInterval: 1h

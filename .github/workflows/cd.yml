@@ -1,0 +1,115 @@
+name: CD - Deploy to EKS
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+      image_tag:
+        description: Immutable ECR image tag, preferably a full Git commit SHA
+        required: true
+        type: string
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'eu-west-2' }}
+  ECR_REPOSITORY_URL: ${{ vars.ECR_REPOSITORY_URL }}
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate deployment inputs
+        shell: bash
+        run: |
+          test -n "${ECR_REPOSITORY_URL}" || {
+            echo "ECR_REPOSITORY_URL repository variable is required"
+            exit 1
+          }
+          test -n "${{ vars.APP_SECRET_NAME }}" || {
+            echo "APP_SECRET_NAME environment variable is required"
+            exit 1
+          }
+          if [[ "${{ inputs.image_tag }}" == "latest" ]]; then
+            echo "Mutable latest tags are not permitted"
+            exit 1
+          fi
+
+      - name: Configure AWS credentials with OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify image exists
+        shell: bash
+        run: |
+          repository="${ECR_REPOSITORY_URL#*/}"
+          aws ecr describe-images \
+            --repository-name "$repository" \
+            --image-ids imageTag=${{ inputs.image_tag }}
+
+      - name: Configure kubectl
+        shell: bash
+        run: |
+          aws eks update-kubeconfig \
+            --name "${{ vars.EKS_CLUSTER_NAME }}" \
+            --region "${AWS_REGION}"
+
+      - name: Resolve deployment settings
+        id: settings
+        shell: bash
+        run: |
+          case "${{ inputs.environment }}" in
+            development)
+              echo "namespace=titanic-api-dev" >> "$GITHUB_OUTPUT"
+              echo "replicas=1" >> "$GITHUB_OUTPUT"
+              ;;
+            staging)
+              echo "namespace=titanic-api-staging" >> "$GITHUB_OUTPUT"
+              echo "replicas=2" >> "$GITHUB_OUTPUT"
+              ;;
+            production)
+              echo "namespace=titanic-api-prod" >> "$GITHUB_OUTPUT"
+              echo "replicas=3" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      - name: Deploy with Helm
+        shell: bash
+        run: |
+          helm upgrade --install titanic-api \
+            ./part-2-kubernetes/helm/titanic-api \
+            --namespace "${{ steps.settings.outputs.namespace }}" \
+            --create-namespace \
+            --set namespace="${{ steps.settings.outputs.namespace }}" \
+            --set image.repository="${ECR_REPOSITORY_URL}" \
+            --set image.tag="${{ inputs.image_tag }}" \
+            --set image.pullPolicy=IfNotPresent \
+            --set replicaCount="${{ steps.settings.outputs.replicas }}" \
+            --set externalSecrets.externalSecret.secretName="${{ vars.APP_SECRET_NAME }}" \
+            --atomic \
+            --wait \
+            --timeout 15m
+
+      - name: Verify rollout
+        shell: bash
+        run: |
+          kubectl rollout status deployment/titanic-api \
+            --namespace "${{ steps.settings.outputs.namespace }}" \
+            --timeout 5m
+          kubectl get pods,service,ingress \
+            --namespace "${{ steps.settings.outputs.namespace }}"

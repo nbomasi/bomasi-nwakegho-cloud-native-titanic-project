@@ -15,10 +15,10 @@ spec:
   ingressClassName: nginx
   tls:
   - hosts:
-    - monitoring.iyere.site
+    - monitoring.example.com
     secretName: grafana-tls
   rules:
-  - host: monitoring.iyere.site
+  - host: monitoring.example.com
     http:
       paths:
       - path: /

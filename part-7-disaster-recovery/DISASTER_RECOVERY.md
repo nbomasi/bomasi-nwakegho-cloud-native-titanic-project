@@ -310,7 +310,7 @@ Actual RPO: 5 minutes (better than 1-hour target)
 
 6. **Verify Application**
    ```bash
-   curl https://titanic-api.iyere.site/health
+   curl https://titanic-api.example.com/health
    ```
 
 **Expected RTO:** 15-30 minutes (Single-AZ) or 2 minutes (Multi-AZ)
@@ -344,7 +344,7 @@ Actual RPO: 5 minutes (better than 1-hour target)
 4. **Verify Recovery**
    ```bash
    kubectl rollout status deployment/titanic-api-prod -n titanic-api-prod
-   curl https://titanic-api.iyere.site/health
+   curl https://titanic-api.example.com/health
    ```
 
 **Expected RTO:** 5-10 minutes
@@ -517,7 +517,7 @@ Actual RPO: 5 minutes (better than 1-hour target)
 
 3. **Verify Application**
    ```bash
-   curl https://titanic-api.iyere.site/health
+   curl https://titanic-api.example.com/health
    ```
 
 **RTO:** ~5 minutes
@@ -548,7 +548,7 @@ Actual RPO: 5 minutes (better than 1-hour target)
 
 4. **Verify Application**
    ```bash
-   curl https://titanic-api.iyere.site/health
+   curl https://titanic-api.example.com/health
    ```
 
 **Expected RTO:** 5-10 minutes
@@ -597,8 +597,8 @@ Actual RPO: 5 minutes (better than 1-hour target)
 
 5. **Verify Traffic Routing**
    ```bash
-   dig titanic-api.iyere.site
-   curl https://titanic-api.iyere.site/health
+   dig titanic-api.example.com
+   curl https://titanic-api.example.com/health
    ```
 
 **Expected RTO:** 1-2 hours
@@ -722,7 +722,7 @@ Actual RPO: 5 minutes (better than 1-hour target)
      --region eu-west-2
    
    kubectl rollout restart deployment/titanic-api-prod -n titanic-api-prod
-   curl https://titanic-api.iyere.site/health
+   curl https://titanic-api.example.com/health
    ```
 
 **Expected Duration:** 30-60 minutes
@@ -754,8 +754,8 @@ Actual RPO: 5 minutes (better than 1-hour target)
 4. **Verify Application**
    ```bash
    kubectl get pods -n titanic-api-prod
-   curl https://titanic-api.iyere.site/health
-   curl https://titanic-api.iyere.site/people
+   curl https://titanic-api.example.com/health
+   curl https://titanic-api.example.com/people
    ```
 
 **Expected Duration:** 5-10 minutes
@@ -998,8 +998,8 @@ EOF
 
 **Application Verification:**
 ```bash
-curl https://titanic-api.iyere.site/health
-curl https://titanic-api.iyere.site/people
+curl https://titanic-api.example.com/health
+curl https://titanic-api.example.com/people
 kubectl logs -n titanic-api-prod -l app=titanic-api --tail=100
 ```
 

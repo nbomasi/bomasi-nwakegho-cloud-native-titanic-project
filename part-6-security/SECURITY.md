@@ -1,6 +1,6 @@
 # Part 6: Security & Compliance
 
-**AWS Account**: 456128143446  
+**AWS Account**: 111122223333  
 **Region**: eu-west-2 (London)  
 **Project**: titanic-api
 
@@ -221,7 +221,7 @@ kubectl describe networkpolicy <policy-name> -n <namespace>
 ```bash
 kubectl get clusterissuer letsencrypt-prod
 kubectl get certificate -n <namespace>
-curl -v https://titanic-api.iyere.site/health
+curl -v https://titanic-api.example.com/health
 ```
 
 ### Database Encryption
@@ -421,13 +421,13 @@ kubectl get serviceaccount external-secrets-operator -n external-secrets-system 
 **Usage Example**:
 ```bash
 # Login
-TOKEN=$(curl -s -X POST https://titanic-api.iyere.site/auth/login \
+TOKEN=$(curl -s -X POST https://titanic-api.example.com/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username": "user1", "password": "password123"}' \
   | jq -r '.token')
 
 # Access protected endpoint
-curl -X GET https://titanic-api.iyere.site/people \
+curl -X GET https://titanic-api.example.com/people \
   -H "Authorization: Bearer $TOKEN"
 ```
 

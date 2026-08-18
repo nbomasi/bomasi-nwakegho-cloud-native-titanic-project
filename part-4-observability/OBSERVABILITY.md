@@ -486,7 +486,7 @@ curl http://localhost:5000/metrics | grep titanic_api
 
 **5. Import Grafana Dashboard**
 
-1. Access Grafana: `https://monitoring.iyere.site`
+1. Access Grafana: `https://monitoring.example.com`
 2. Login with credentials from Kubernetes secret:
    ```bash
    kubectl get secret kube-prometheus-stack-grafana -n monitoring -o jsonpath='{.data.admin-password}' | base64 -d
@@ -501,8 +501,8 @@ curl http://localhost:5000/metrics | grep titanic_api
 ```bash
 # Generate sample traffic
 for i in {1..30}; do
-  curl -s https://titanic-api.iyere.site/health > /dev/null
-  curl -s https://titanic-api.iyere.site/ > /dev/null
+  curl -s https://titanic-api.example.com/health > /dev/null
+  curl -s https://titanic-api.example.com/ > /dev/null
   sleep 1
 done
 ```
@@ -530,7 +530,7 @@ kubectl logs -n titanic-api -l app=titanic-api,component=api --tail=10 | jq .
 
 ### Grafana Access
 
-**Production URL:** `https://monitoring.iyere.site`
+**Production URL:** `https://monitoring.example.com`
 
 **Credentials:**
 - Username: `admin`

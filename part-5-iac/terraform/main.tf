@@ -111,7 +111,7 @@ module "eks_cluster" {
 # This wait ensures the API server is accessible before Helm deployments
 resource "time_sleep" "wait_for_cluster" {
   depends_on      = [module.eks_cluster]
-  create_duration = "300s"  # 5 minutes - allows cluster API to be fully ready
+  create_duration = "300s" # 5 minutes - allows cluster API to be fully ready
 }
 
 resource "kubernetes_storage_class" "auto_mode_ebs" {

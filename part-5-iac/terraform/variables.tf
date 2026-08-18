@@ -46,12 +46,6 @@ variable "aws_profile" {
   default     = ""
 }
 
-variable "aws_account_id" {
-  description = "AWS account ID for deployment"
-  type        = string
-  default     = "456128143446"
-}
-
 # VPC Configuration
 variable "vpc_cidr" {
   description = "CIDR block for VPC"
@@ -218,11 +212,11 @@ variable "enable_route53_hosted_zone" {
 variable "route53_domain_name" {
   description = "Domain name for the Route53 hosted zone"
   type        = string
-  default     = "titanic-api.iyere.site"
+  default     = "titanic-api.example.com"
 }
 
 variable "route53_parent_zone_name" {
-  description = "Parent domain name (e.g., iyere.site for titanic-api.iyere.site subdomain) - for automatic delegation"
+  description = "Parent domain name (e.g., example.com for titanic-api.example.com subdomain) - for automatic delegation"
   type        = string
   default     = ""
 }
@@ -336,7 +330,7 @@ variable "external_dns_namespace" {
 variable "external_dns_chart_version" {
   description = "Version of the External DNS Helm chart (leave empty for latest)"
   type        = string
-  default     = ""  # Use latest version - pinning can cause version not found errors
+  default     = "" # Use latest version - pinning can cause version not found errors
 }
 
 variable "external_dns_service_account" {
@@ -407,7 +401,7 @@ variable "enable_acm_certificate" {
 }
 
 variable "acm_domain_name" {
-  description = "Primary domain name for the ACM certificate (supports wildcard, e.g., *.titanic-api.iyere.site)"
+  description = "Primary domain name for the ACM certificate (supports wildcard, e.g., *.titanic-api.example.com)"
   type        = string
   default     = ""
 }
@@ -638,7 +632,7 @@ variable "kube_prometheus_stack_storage_size" {
 variable "kube_prometheus_stack_storage_class" {
   description = "Storage class for Prometheus persistent volume. Defaults to 'auto-ebs-sc' (created by Terraform). Leave empty to use the auto-created storage class."
   type        = string
-  default     = ""  # Empty string uses kubernetes_storage_class.auto_mode_ebs
+  default     = "" # Empty string uses kubernetes_storage_class.auto_mode_ebs
 }
 
 variable "kube_prometheus_stack_grafana_password_secret_name" {

@@ -15,7 +15,7 @@ NAMESPACE="${1:-titanic-api}"
 IMAGE_TAG="${2:-latest}"
 ENVIRONMENT="${3:-production}"
 MANIFESTS_DIR="${MANIFESTS_DIR:-part-2-kubernetes/manifests}"
-ECR_REPOSITORY_URL="${ECR_REPOSITORY_URL:-456128143446.dkr.ecr.eu-west-2.amazonaws.com/titanic-api/titanic-api-repo}"
+ECR_REPOSITORY_URL="${ECR_REPOSITORY_URL:?ECR_REPOSITORY_URL must be set}"
 IMAGE_URL="${ECR_REPOSITORY_URL}:${IMAGE_TAG}"
 
 echo -e "${GREEN}=== Deploying Titanic API ===${NC}"

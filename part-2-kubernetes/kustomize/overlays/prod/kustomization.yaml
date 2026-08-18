@@ -48,10 +48,10 @@ patches:
     patch: |-
       - op: replace
         path: /spec/rules/0/host
-        value: titanic-api.iyere.site
+        value: titanic-api.example.com
       - op: replace
         path: /spec/tls/0/hosts/0
-        value: titanic-api.iyere.site
+        value: titanic-api.example.com
 
 configMapGenerator:
   - name: titanic-config

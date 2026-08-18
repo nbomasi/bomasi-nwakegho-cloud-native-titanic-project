@@ -7,9 +7,9 @@ variable "environment" {
 }
 
 variable "ecr_namespace" {
-  description = "ECR namespace/prefix for repositories (e.g., 'dareyioinfra', 'v1', or empty for root)"
+  description = "ECR namespace/prefix for repositories (e.g., 'platform', 'v1', or empty for root)"
   type        = string
-  default     = "dareyioinfra"
+  default     = "platform"
 }
 
 variable "repositories" {

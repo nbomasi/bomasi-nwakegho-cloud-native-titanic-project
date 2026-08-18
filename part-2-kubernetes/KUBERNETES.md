@@ -143,7 +143,7 @@ part-2-kubernetes/
 - Security: Non-root user (UID 1000), read-only root filesystem
 - Resources: CPU 100m-500m, Memory 512Mi-1Gi
 - Probes: Liveness and readiness on /health endpoint
-- Image: ECR repository (456128143446.dkr.ecr.eu-west-2.amazonaws.com/titanic-api/titanic-api-repo:latest)
+- Image: ECR repository (111122223333.dkr.ecr.eu-west-2.amazonaws.com/titanic-api/titanic-api-repo:latest)
 
 **Database:** External managed service (AWS RDS PostgreSQL) via VPC private subnet. Credentials managed via AWS Secrets Manager and ExternalSecret.
 
@@ -213,7 +213,7 @@ part-2-kubernetes/
 
 ### Ingress
 
-**Configuration:** Ingress Class nginx, TLS enabled (cert-manager), SSL redirect, Host: titanic-api.iyere.site, Paths: `/`, `/health`, `/people`. Automatic certificate via Let's Encrypt.
+**Configuration:** Ingress Class nginx, TLS enabled (cert-manager), SSL redirect, Host: titanic-api.example.com, Paths: `/`, `/health`, `/people`. Automatic certificate via Let's Encrypt.
 
 ## Deployment Strategy
 

@@ -1,6 +1,6 @@
 # Part 5: Infrastructure as Code
 
-**AWS Account**: 456128143446  
+**AWS Account**: 111122223333  
 **Region**: eu-west-2 (London)  
 **Project**: titanic-api
 
@@ -44,7 +44,7 @@ This document provides comprehensive documentation for the Titanic API infrastru
 | Database | RDS PostgreSQL | 17.6, Multi-AZ (prod), Encrypted |
 | Load Balancer | NGINX Ingress | Network Load Balancer |
 | Container Registry | ECR | titanic-api namespace |
-| DNS | Route53 | titanic-api.iyere.site |
+| DNS | Route53 | titanic-api.example.com |
 | State Management | S3 + DynamoDB | Separate per environment |
 | Secrets | Secrets Manager | Auto-generated credentials |
 
@@ -58,7 +58,7 @@ This document provides comprehensive documentation for the Titanic API infrastru
 Internet
     |
     v
-Route53 (titanic-api.iyere.site)
+Route53 (titanic-api.example.com)
     |
     v
 Network Load Balancer (Public Subnet)
@@ -104,7 +104,7 @@ RDS PostgreSQL (Private Subnet)
 - Network Security: Security groups, private subnets, no public RDS access
 
 **DNS and Certificate Management**
-- Route53: Hosted zone for titanic-api.iyere.site
+- Route53: Hosted zone for titanic-api.example.com
 - Cert-Manager: TLS/SSL certificates via DNS-01 challenge
 - External DNS: Automatic DNS record management
 

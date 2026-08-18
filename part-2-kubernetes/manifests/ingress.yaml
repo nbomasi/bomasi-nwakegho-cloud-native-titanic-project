@@ -15,10 +15,10 @@ spec:
   ingressClassName: nginx
   tls:
   - hosts:
-    - titanic-api.iyere.site
+    - titanic-api.example.com
     secretName: titanic-api-tls
   rules:
-  - host: titanic-api.iyere.site
+  - host: titanic-api.example.com
     http:
       paths:
       - path: /

@@ -36,42 +36,6 @@ spec:
       {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      {{- if .Values.externalSecrets.externalSecret.enabled }}
-      initContainers:
-      - name: wait-for-secrets
-        image: bitnami/kubectl:latest
-        command:
-        - sh
-        - -c
-        - |
-          echo "Waiting for secret {{ .Values.externalSecrets.externalSecret.targetSecretName }}..."
-          SECRET_NAME="{{ .Values.externalSecrets.externalSecret.targetSecretName }}"
-          NAMESPACE="{{ .Values.namespace | default "titanic-api" }}"
-          MAX_ATTEMPTS=60
-          ATTEMPT=0
-          
-          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-            ATTEMPT=$((ATTEMPT + 1))
-            if kubectl get secret "$SECRET_NAME" -n "$NAMESPACE" > /dev/null 2>&1; then
-              echo "✓ Secret $SECRET_NAME found!"
-              exit 0
-            fi
-            echo "Secret not found, waiting... ($ATTEMPT/$MAX_ATTEMPTS)"
-            sleep 2
-          done
-          
-          echo "⚠ Warning: Secret $SECRET_NAME not found after $MAX_ATTEMPTS attempts."
-          echo "Proceeding - application will handle missing secret gracefully."
-          exit 0
-        securityContext:
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          runAsNonRoot: true
-          runAsUser: 1001
-          capabilities:
-            drop:
-            - ALL
-      {{- end }}
       containers:
       - name: {{ .Chart.Name }}
         securityContext:
@@ -86,7 +50,7 @@ spec:
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
-              name: {{ if .Values.externalSecrets.externalSecret.enabled }}{{ .Values.externalSecrets.externalSecret.targetSecretName }}{{ else }}{{ include "titanic-api.fullname" . }}-secrets{{ end }}
+              name: {{ if .Values.externalSecrets.externalSecret.enabled }}{{ .Values.externalSecrets.externalSecret.targetSecretName }}{{ else }}{{ .Values.secrets.existingSecret }}{{ end }}
               key: database-url
         - name: FLASK_ENV
           valueFrom:
@@ -96,7 +60,7 @@ spec:
         - name: JWT_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              name: {{ if .Values.externalSecrets.externalSecret.enabled }}{{ .Values.externalSecrets.externalSecret.targetSecretName }}{{ else }}{{ include "titanic-api.fullname" . }}-secrets{{ end }}
+              name: {{ if .Values.externalSecrets.externalSecret.enabled }}{{ .Values.externalSecrets.externalSecret.targetSecretName }}{{ else }}{{ .Values.secrets.existingSecret }}{{ end }}
               key: jwt-secret-key
         livenessProbe:
           {{- toYaml .Values.livenessProbe | nindent 10 }}
@@ -163,12 +127,12 @@ spec:
         - name: POSTGRES_USER
           valueFrom:
             secretKeyRef:
-              name: {{ include "titanic-api.fullname" . }}-secrets
+              name: {{ if .Values.externalSecrets.externalSecret.enabled }}{{ .Values.externalSecrets.externalSecret.targetSecretName }}{{ else }}{{ .Values.secrets.existingSecret }}{{ end }}
               key: postgres-user
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: {{ include "titanic-api.fullname" . }}-secrets
+              name: {{ if .Values.externalSecrets.externalSecret.enabled }}{{ .Values.externalSecrets.externalSecret.targetSecretName }}{{ else }}{{ .Values.secrets.existingSecret }}{{ end }}
               key: postgres-password
         - name: POSTGRES_DB
           valueFrom:
